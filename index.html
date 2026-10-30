@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlowTech | Washroom Automation Solutions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="main-nav">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo">FLOWTECH</a>
+      <ul class="nav-links">
+        <li class="has-megamenu"><a href="#" class="megamenu-trigger">Products</a>
+          <div class="megamenu">
+            <div class="megamenu-col">
+              <h4>Washroom Automation</h4>
+              <a href="products.html#handdryers">Hand Dryers</a>
+              <a href="products.html#taps">Automatic Taps</a>
+              <a href="products.html#dispensers">Soap Dispensers</a>
+              <a href="products.html#sensors">Sensor Flushers</a>
+            </div>
+            <div class="megamenu-col">
+              <h4>Entrance &amp; More</h4>
+              <a href="products.html#entrance">Entrance Automation</a>
+              <a href="products.html#accessories">Accessories</a>
+            </div>
+            <div class="megamenu-feature">
+              <img src="https://images.pexels.com/photos/20059730/pexels-photo-20059730.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Featured washroom automation">
+              <a href="products.html" class="megamenu-feature-link">View All Products →</a>
+            </div>
+          </div>
+        </li>
+        <li><a href="ideas.html">Projects</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="professionals.html">Trade &amp; Specifiers</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-search" aria-label="Search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+        <button class="nav-icon-btn" id="account-btn" aria-label="Account"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></button>
+        <button class="nav-icon-btn" id="cart-btn" aria-label="Cart"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L20 8H6"/><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg><span class="cart-count">0</span></button>
+        <a href="favorites.html" class="nav-favorites" aria-label="Favorites"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.5-9.3-9A5 5 0 0 1 12 6a5 5 0 0 1 9.3 5c-2.3 4.5-9.3 9-9.3 9z"/></svg><span class="favorites-count" hidden>0</span></a>
+        <a href="services.html#contact" class="btn-cta small nav-enquire">Enquire Now</a>
+        <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+      </div>
+      <div class="search-panel">
+        <input type="text" class="search-input" placeholder="Search products (min. 3 characters)">
+        <div class="search-results"></div>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<section class="hero-split" id="hero-split">
+  <div class="hero-panel" style="background-image: url('https://images.pexels.com/photos/20059730/pexels-photo-20059730.jpeg?auto=compress&cs=tinysrgb&w=1200');" data-title="Dry Hands in 10 Seconds" data-text="High-speed hand dryers built for continuous commercial use." data-link="products.html#handdryers" data-cta="Explore Hand Dryers"></div>
+  <div class="hero-panel" style="background-image: url('https://images.pexels.com/photos/12124656/pexels-photo-12124656.jpeg?auto=compress&cs=tinysrgb&w=1200');" data-title="Soap + Water. One Touch-Free Unit." data-text="Reduce cross-contamination with fully touchless taps." data-link="products.html#taps" data-cta="Explore Sensor Taps"></div>
+  <div class="hero-panel" style="background-image: url('https://images.pexels.com/photos/433624/pexels-photo-433624.jpeg?auto=compress&cs=tinysrgb&w=1200');" data-title="No Touch. No Waste." data-text="Programmable dispensers for high-traffic washrooms." data-link="products.html#dispensers" data-cta="Explore Dispensers" hidden></div>
+  <div class="hero-panel" style="background-image: url('https://images.pexels.com/photos/18939181/pexels-photo-18939181.jpeg?auto=compress&cs=tinysrgb&w=1200');" data-title="Advanced Entrance Solutions" data-text="Swing, sliding and revolving door automation at scale." data-link="products.html#entrance" data-cta="Explore Entrance Automation" hidden></div>
+  <button type="button" class="hero-arrow hero-arrow-prev" aria-label="Previous">‹</button>
+  <button type="button" class="hero-arrow hero-arrow-next" aria-label="Next">›</button>
+</section>
+
+<section class="trust-bar">
+  <div class="container trust-bar-inner">
+    <div class="trust-item"><span class="trust-icon">✅</span>Industry Certified</div>
+    <div class="trust-item"><span class="trust-icon">👥</span>50,000+ Happy Customers</div>
+    <div class="trust-item"><span class="trust-icon">🏭</span>Large-Scale Manufacturing</div>
+    <div class="trust-item"><span class="trust-icon">🛠️</span>Nationwide Installation Support</div>
+  </div>
+</section>
+
+<section id="collections" class="collections">
+  <div class="container">
+    <h2 class="centered-heading">Explore Our Collection</h2>
+    <div class="overlay-grid">
+      <a href="products.html#handdryers" class="overlay-card" style="background-image: url('https://images.pexels.com/photos/8089093/pexels-photo-8089093.jpeg?auto=compress&cs=tinysrgb&w=800');">
+        <span class="overlay-card-title">Washroom</span>
+        <span class="btn-cta btn-hero overlay-card-btn">Explore More</span>
+      </a>
+      <a href="products.html#entrance" class="overlay-card" style="background-image: url('https://images.pexels.com/photos/1098982/pexels-photo-1098982.jpeg?auto=compress&cs=tinysrgb&w=800');">
+        <span class="overlay-card-title">Industrial &amp; Entrance</span>
+        <span class="btn-cta btn-hero overlay-card-btn">Explore More</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section id="products" class="categories">
+  <div class="container">
+    <h2>Shop by Category</h2>
+    <div class="category-grid">
+      <a href="products.html#handdryers" class="category-tile"><span class="cat-icon">🌬️</span>Hand Dryers</a>
+      <a href="products.html#taps" class="category-tile"><span class="cat-icon">🚰</span>Automatic Taps</a>
+      <a href="products.html#dispensers" class="category-tile"><span class="cat-icon">🧴</span>Soap Dispensers</a>
+      <a href="products.html#sensors" class="category-tile"><span class="cat-icon">♻️</span>Sensor Flushers</a>
+      <a href="products.html#entrance" class="category-tile"><span class="cat-icon">🚪</span>Entrance Automation</a>
+      <a href="products.html#accessories" class="category-tile"><span class="cat-icon">🪞</span>Accessories</a>
+    </div>
+  </div>
+</section>
+
+<section id="new-arrivals" class="products-section">
+  <div class="container">
+    <div class="section-heading-row">
+      <h2>New Arrivals</h2>
+      <a href="products.html" class="section-explore">View All →</a>
+    </div>
+    <div class="product-grid">
+      <article class="product-card">
+        <div class="product-image"><span class="product-badge badge-new">New</span><img src="https://images.pexels.com/photos/20059730/pexels-photo-20059730.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Jet Hand Dryer" loading="lazy"></div>
+        <h3>Jet Hand Dryer</h3>
+        <p class="product-cat">Hand Dryers · Brushless motor, medium traffic</p>
+        <p class="product-price js-price" data-id="1"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="product-detail.html?id=1" class="btn-cta small">Buy Now</a>
+        </div>
+      </article>
+      <article class="product-card">
+        <div class="product-image"><span class="product-badge badge-new">New</span><img src="https://images.pexels.com/photos/4238996/pexels-photo-4238996.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Mirror with Sensor Light" loading="lazy"></div>
+        <h3>Mirror with Sensor Light</h3>
+        <p class="product-cat">Accessories · Motion-activated LED surround</p>
+        <p class="product-price js-price" data-id="43"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="product-detail.html?id=43" class="btn-cta small">Buy Now</a>
+        </div>
+      </article>
+      <article class="product-card">
+        <div class="product-image"><span class="product-badge badge-new">New</span><img src="https://images.pexels.com/photos/1098982/pexels-photo-1098982.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Glass Door Automation Kit" loading="lazy"></div>
+        <h3>Glass Door Automation Kit</h3>
+        <p class="product-cat">Entrance Automation · Retrofit kit for existing doors</p>
+        <p class="product-price js-price" data-id="38"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="product-detail.html?id=38" class="btn-cta small">Buy Now</a>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="best-sellers" class="products-section alt-bg">
+  <div class="container">
+    <div class="section-heading-row">
+      <h2>Best Sellers</h2>
+      <a href="products.html" class="section-explore">View All →</a>
+    </div>
+    <div class="product-grid">
+      <article class="product-card">
+        <div class="product-image"><img src="https://images.pexels.com/photos/433624/pexels-photo-433624.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Automatic Foam Dispenser" loading="lazy"></div>
+        <h3>Automatic Foam Dispenser</h3>
+        <p class="product-cat">Soap Dispensers · Battery, wall-mounted</p>
+        <p class="product-price js-price" data-id="17"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="services.html#contact" class="btn-outline small">B2B Enquiry</a>
+        </div>
+      </article>
+      <article class="product-card">
+        <div class="product-image"><img src="https://images.pexels.com/photos/12124656/pexels-photo-12124656.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Sensor Basin Tap" loading="lazy"></div>
+        <h3>Sensor Basin Tap</h3>
+        <p class="product-cat">Automatic Taps · Basin mount</p>
+        <p class="product-price js-price" data-id="9"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="services.html#contact" class="btn-outline small">B2B Enquiry</a>
+        </div>
+      </article>
+      <article class="product-card">
+        <div class="product-image"><img src="https://images.pexels.com/photos/1909656/pexels-photo-1909656.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Urinal Sensor Flush Valve" loading="lazy"></div>
+        <h3>Urinal Sensor Flush Valve</h3>
+        <p class="product-cat">Sensor Flushers · Battery operated</p>
+        <p class="product-price js-price" data-id="25"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="services.html#contact" class="btn-outline small">B2B Enquiry</a>
+        </div>
+      </article>
+      <article class="product-card">
+        <div class="product-image"><img src="https://images.pexels.com/photos/18939181/pexels-photo-18939181.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Automatic Swing Door Operator" loading="lazy"></div>
+        <h3>Automatic Swing Door Operator</h3>
+        <p class="product-cat">Entrance Automation · Mains operated</p>
+        <p class="product-price js-price" data-id="33"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="services.html#contact" class="btn-outline small">B2B Enquiry</a>
+        </div>
+      </article>
+      <article class="product-card">
+        <div class="product-image"><img src="https://images.pexels.com/photos/4238996/pexels-photo-4238996.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Grab Bar" loading="lazy"></div>
+        <h3>Grab Bar</h3>
+        <p class="product-cat">Accessories · 60cm, stainless steel</p>
+        <p class="product-price js-price" data-id="42"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="services.html#contact" class="btn-outline small">B2B Enquiry</a>
+        </div>
+      </article>
+      <article class="product-card">
+        <div class="product-image"><img src="https://images.pexels.com/photos/709749/pexels-photo-709749.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Infrared Mixer Tap" loading="lazy"></div>
+        <h3>Infrared Mixer Tap</h3>
+        <p class="product-cat">Automatic Taps · Mains operated</p>
+        <p class="product-price js-price" data-id="10"></p>
+        <div class="product-card-actions">
+          <button type="button" class="btn-outline small" onclick="alert('Added to cart (demo only).')">Add to Cart</button>
+          <a href="services.html#contact" class="btn-outline small">B2B Enquiry</a>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="blog-section">
+  <div class="container">
+    <div class="section-heading-row">
+      <h2>From the Blog</h2>
+      <a href="ideas.html" class="section-explore">View All →</a>
+    </div>
+    <div class="collection-grid collection-grid-3">
+      <article class="collection-card">
+        <div class="card-image"><img src="https://images.pexels.com/photos/18939181/pexels-photo-18939181.jpeg?auto=compress&cs=tinysrgb&w=600" alt="What is an air curtain?"></div>
+        <h3>What Is an Air Curtain, and Do You Need One?</h3>
+        <p>How air curtains cut energy loss at busy entrances.</p>
+        <a href="article-detail.html?title=What%20Is%20an%20Air%20Curtain%2C%20and%20Do%20You%20Need%20One%3F&summary=How%20air%20curtains%20cut%20energy%20loss%20at%20busy%20entrances.&img=https%3A%2F%2Fimages.pexels.com%2Fphotos%2F18939181%2Fpexels-photo-18939181.jpeg%3Fauto%3Dcompress%26cs%3Dtinysrgb%26w%3D600&back=ideas.html&backLabel=%E2%86%90%20Back%20to%20Projects">Read More →</a>
+      </article>
+      <article class="collection-card">
+        <div class="card-image"><img src="https://images.pexels.com/photos/12124656/pexels-photo-12124656.jpeg?auto=compress&cs=tinysrgb&w=600" alt="How sensor taps work"></div>
+        <h3>How Sensor Taps Actually Work</h3>
+        <p>A look at infrared detection and why it saves water.</p>
+        <a href="article-detail.html?title=How%20Sensor%20Taps%20Actually%20Work&summary=A%20look%20at%20infrared%20detection%20and%20why%20it%20saves%20water.&img=https%3A%2F%2Fimages.pexels.com%2Fphotos%2F12124656%2Fpexels-photo-12124656.jpeg%3Fauto%3Dcompress%26cs%3Dtinysrgb%26w%3D600&back=ideas.html&backLabel=%E2%86%90%20Back%20to%20Projects">Read More →</a>
+      </article>
+      <article class="collection-card">
+        <div class="card-image"><img src="https://images.pexels.com/photos/433624/pexels-photo-433624.jpeg?auto=compress&cs=tinysrgb&w=600" alt="Wall-mounted dispensers for high-traffic areas"></div>
+        <h3>Choosing Dispensers for High-Traffic Washrooms</h3>
+        <p>Capacity, refill cycles and vandal-resistance explained.</p>
+        <a href="article-detail.html?title=Choosing%20Dispensers%20for%20High-Traffic%20Washrooms&summary=Capacity%2C%20refill%20cycles%20and%20vandal-resistance%20explained.&img=https%3A%2F%2Fimages.pexels.com%2Fphotos%2F433624%2Fpexels-photo-433624.jpeg%3Fauto%3Dcompress%26cs%3Dtinysrgb%26w%3D600&back=ideas.html&backLabel=%E2%86%90%20Back%20to%20Projects">Read More →</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="services-section">
+  <div class="container">
+    <div class="section-heading-row">
+      <h2>Our Services</h2>
+    </div>
+    <div class="services-grid">
+      <a href="services.html#contact" class="service-card">
+        <span class="service-icon">✉️</span>
+        <h3>Contact Us</h3>
+        <p>Questions about a product or a bulk order? Get in touch.</p>
+      </a>
+      <a href="professionals.html#brochures" class="service-card">
+        <span class="service-icon">📄</span>
+        <h3>Catalogue &amp; Brochures</h3>
+        <p>Download product catalogues and specification sheets.</p>
+      </a>
+      <a href="services.html#showroom" class="service-card">
+        <span class="service-icon">📍</span>
+        <h3>Where to Buy</h3>
+        <p>Find your nearest dealer or authorized installer.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="about.html">About Us</a>
+      <a href="about.html#investors">Investor Relations</a>
+      <a href="about.html#careers">Careers</a>
+    </div>
+    <div class="footer-col">
+      <h4>Products</h4>
+      <a href="products.html#handdryers">Hand Dryers</a>
+      <a href="products.html#taps">Automatic Taps</a>
+      <a href="professionals.html#brochures">Brochures</a>
+    </div>
+    <div class="footer-col">
+      <h4>Support</h4>
+      <a href="services.html#faq">FAQ</a>
+      <a href="services.html#contact">Contact Us</a>
+      <a href="services.html#showroom">Find a Dealer</a>
+    </div>
+    <div class="footer-col">
+      <h4>Follow Us</h4>
+      <div class="social-links">
+        <a href="#" aria-label="LinkedIn">in</a>
+        <a href="#" aria-label="Instagram">IG</a>
+        <a href="#" aria-label="YouTube">YT</a>
+        <a href="#" aria-label="Facebook">f</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container footer-bottom-inner">
+      <p>&copy; 2026 FlowTech. All rights reserved.</p>
+      <div class="footer-legal-links">
+        <a href="about.html#privacy">Privacy Policy</a>
+        <a href="about.html#quality">Quality Policy</a>
+        <a href="about.html#investors">Investor Relations</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="catalog.js"></script>
+<script src="shop.js"></script>
+<script src="script.js"></script>
+<script>
+  document.querySelectorAll('.js-price').forEach((el) => {
+    const product = getProductById(el.dataset.id);
+    if (product) el.innerHTML = formatPriceWithStrike(product.price);
+  });
+</script>
+</body>
+</html>

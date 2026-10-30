@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saved Items | FlowTech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="main-nav">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo">FLOWTECH</a>
+      <ul class="nav-links">
+        <li class="has-megamenu"><a href="#" class="megamenu-trigger">Products</a>
+          <div class="megamenu">
+            <div class="megamenu-col">
+              <h4>Washroom Automation</h4>
+              <a href="products.html#handdryers">Hand Dryers</a>
+              <a href="products.html#taps">Automatic Taps</a>
+              <a href="products.html#dispensers">Soap Dispensers</a>
+              <a href="products.html#sensors">Sensor Flushers</a>
+            </div>
+            <div class="megamenu-col">
+              <h4>Entrance &amp; More</h4>
+              <a href="products.html#entrance">Entrance Automation</a>
+              <a href="products.html#accessories">Accessories</a>
+            </div>
+            <div class="megamenu-feature">
+              <img src="https://images.pexels.com/photos/20059730/pexels-photo-20059730.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Featured washroom automation">
+              <a href="products.html" class="megamenu-feature-link">View All Products →</a>
+            </div>
+          </div>
+        </li>
+        <li><a href="ideas.html">Projects</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="professionals.html">Trade &amp; Specifiers</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-search" aria-label="Search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+        <button class="nav-icon-btn" id="account-btn" aria-label="Account"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></button>
+        <button class="nav-icon-btn" id="cart-btn" aria-label="Cart"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L20 8H6"/><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg><span class="cart-count">0</span></button>
+        <a href="favorites.html" class="nav-favorites" aria-label="Favorites"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.5-9.3-9A5 5 0 0 1 12 6a5 5 0 0 1 9.3 5c-2.3 4.5-9.3 9-9.3 9z"/></svg><span class="favorites-count" hidden>0</span></a>
+        <a href="services.html#contact" class="btn-cta small nav-enquire">Enquire Now</a>
+        <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+      </div>
+      <div class="search-panel">
+        <input type="text" class="search-input" placeholder="Search products (min. 3 characters)">
+        <div class="search-results"></div>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<section class="page-hero" style="background-image: linear-gradient(rgba(18,18,18,0.6), rgba(18,18,18,0.6)), url('https://images.pexels.com/photos/8089093/pexels-photo-8089093.jpeg?auto=compress&cs=tinysrgb&w=1600');">
+  <div class="container">
+    <h1>Saved Items</h1>
+    <p>Products you've added to your favorites.</p>
+  </div>
+</section>
+
+<section class="anchor-section">
+  <div class="container">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span class="current">Saved Items</span></nav>
+    <div class="product-grid" id="favorites-grid"></div>
+    <p class="centered-note" id="favorites-empty" hidden>You haven't saved any products yet. Browse the <a href="products.html">full range</a> and tap the heart icon on anything you like.</p>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="about.html">About Us</a>
+      <a href="about.html#investors">Investor Relations</a>
+      <a href="about.html#careers">Careers</a>
+    </div>
+    <div class="footer-col">
+      <h4>Products</h4>
+      <a href="products.html#handdryers">Hand Dryers</a>
+      <a href="products.html#taps">Automatic Taps</a>
+      <a href="professionals.html#brochures">Brochures</a>
+    </div>
+    <div class="footer-col">
+      <h4>Support</h4>
+      <a href="services.html#faq">FAQ</a>
+      <a href="services.html#contact">Contact Us</a>
+      <a href="services.html#showroom">Find a Dealer</a>
+    </div>
+    <div class="footer-col">
+      <h4>Follow Us</h4>
+      <div class="social-links">
+        <a href="#" aria-label="LinkedIn">in</a>
+        <a href="#" aria-label="Instagram">IG</a>
+        <a href="#" aria-label="YouTube">YT</a>
+        <a href="#" aria-label="Facebook">f</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container footer-bottom-inner">
+      <p>&copy; 2026 FlowTech. All rights reserved.</p>
+      <div class="footer-legal-links">
+        <a href="about.html#privacy">Privacy Policy</a>
+        <a href="about.html#quality">Quality Policy</a>
+        <a href="about.html#investors">Investor Relations</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="catalog.js"></script>
+<script src="shop.js"></script>
+<script src="script.js"></script>
+<script>
+  function renderFavorites() {
+    const ids = getFavorites();
+    const grid = document.getElementById('favorites-grid');
+    const empty = document.getElementById('favorites-empty');
+    const items = ids.map((id) => getProductById(id)).filter(Boolean);
+
+    if (items.length === 0) {
+      grid.innerHTML = '';
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    grid.innerHTML = items
+      .map((p) => {
+        const img = getProductImages(p, 400)[0];
+        return `
+        <article class="product-card">
+          <div class="product-image">
+            <img src="${img}" alt="${p.name}" loading="lazy">
+            <button type="button" class="favorite-btn favorite-active" data-id="${p.id}" aria-pressed="true" aria-label="Remove from favorites">♥</button>
+            ${!p.stock ? '<span class="stock-badge">Out of Stock</span>' : ""}
+          </div>
+          <p class="product-code">${p.code}</p>
+          <h3><a href="product-detail.html?id=${p.id}">${p.name}</a></h3>
+          <p class="product-price">${formatPrice(p.price)}</p>
+          <a href="product-detail.html?id=${p.id}" class="btn-outline small">View Item</a>
+        </article>`;
+      })
+      .join('');
+
+    grid.querySelectorAll('.favorite-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        toggleFavorite(btn.dataset.id);
+        renderFavorites();
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded', renderFavorites);
+</script>
+</body>
+</html>

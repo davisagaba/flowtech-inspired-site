@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">Product | FlowTech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="main-nav">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo">FLOWTECH</a>
+      <ul class="nav-links">
+        <li class="has-megamenu"><a href="#" class="megamenu-trigger">Products</a>
+          <div class="megamenu">
+            <div class="megamenu-col">
+              <h4>Washroom Automation</h4>
+              <a href="products.html#handdryers">Hand Dryers</a>
+              <a href="products.html#taps">Automatic Taps</a>
+              <a href="products.html#dispensers">Soap Dispensers</a>
+              <a href="products.html#sensors">Sensor Flushers</a>
+            </div>
+            <div class="megamenu-col">
+              <h4>Entrance &amp; More</h4>
+              <a href="products.html#entrance">Entrance Automation</a>
+              <a href="products.html#accessories">Accessories</a>
+            </div>
+            <div class="megamenu-feature">
+              <img src="https://images.pexels.com/photos/20059730/pexels-photo-20059730.jpeg?auto=compress&cs=tinysrgb&w=500" alt="Featured washroom automation">
+              <a href="products.html" class="megamenu-feature-link">View All Products →</a>
+            </div>
+          </div>
+        </li>
+        <li><a href="ideas.html">Projects</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="professionals.html">Trade &amp; Specifiers</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-search" aria-label="Search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+        <button class="nav-icon-btn" id="account-btn" aria-label="Account"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></button>
+        <button class="nav-icon-btn" id="cart-btn" aria-label="Cart"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L20 8H6"/><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg><span class="cart-count">0</span></button>
+        <a href="favorites.html" class="nav-favorites" aria-label="Favorites"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.5-9.3-9A5 5 0 0 1 12 6a5 5 0 0 1 9.3 5c-2.3 4.5-9.3 9-9.3 9z"/></svg><span class="favorites-count" hidden>0</span></a>
+        <a href="services.html#contact" class="btn-cta small nav-enquire">Enquire Now</a>
+        <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+      </div>
+      <div class="search-panel">
+        <input type="text" class="search-input" placeholder="Search products (min. 3 characters)">
+        <div class="search-results"></div>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<section class="anchor-section">
+  <div class="container">
+    <nav class="breadcrumbs" id="breadcrumbs" aria-label="Breadcrumb"></nav>
+  </div>
+  <div class="container detail-layout">
+    <div class="detail-gallery">
+      <div class="detail-image"><img id="detail-img" src="" alt=""></div>
+      <div class="detail-thumbs" id="detail-thumbs"></div>
+    </div>
+    <div class="detail-info">
+      <p class="product-cat" id="detail-cat"></p>
+      <h1 id="detail-name"></h1>
+      <p class="product-code" id="detail-code"></p>
+      <p class="detail-price" id="detail-price"></p>
+      <p class="stock-status" id="detail-stock"></p>
+      <p class="centered-note" id="detail-desc"></p>
+
+      <form class="add-to-cart" id="add-to-cart-form">
+        <label>Quantity
+          <input type="number" value="1" min="1" id="qty">
+        </label>
+        <button type="submit" class="btn-cta" id="add-to-cart-btn">Add to Basket</button>
+      </form>
+
+      <form class="notify-form" id="notify-form" hidden>
+        <label>Email me when back in stock
+          <input type="email" required placeholder="you@example.com" id="notify-email">
+        </label>
+        <button type="submit" class="btn-outline">Notify Me</button>
+      </form>
+
+      <div class="detail-actions">
+        <button type="button" class="favorite-btn-large" id="favorite-btn-large">♥ <span id="favorite-label">Add to Favorites</span></button>
+        <label class="compare-option">
+          <input type="checkbox" class="compare-checkbox" id="compare-checkbox-detail">
+          Add to Compare
+        </label>
+      </div>
+
+      <div class="share-row">
+        <span class="share-label">Share:</span>
+        <div class="share-buttons" id="share-buttons"></div>
+      </div>
+      <a href="products.html" class="btn-outline">← Back to Products</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="about.html">About Us</a>
+      <a href="about.html#investors">Investor Relations</a>
+      <a href="about.html#careers">Careers</a>
+    </div>
+    <div class="footer-col">
+      <h4>Products</h4>
+      <a href="products.html#handdryers">Hand Dryers</a>
+      <a href="products.html#taps">Automatic Taps</a>
+      <a href="professionals.html#brochures">Brochures</a>
+    </div>
+    <div class="footer-col">
+      <h4>Support</h4>
+      <a href="services.html#faq">FAQ</a>
+      <a href="services.html#contact">Contact Us</a>
+      <a href="services.html#showroom">Find a Dealer</a>
+    </div>
+    <div class="footer-col">
+      <h4>Follow Us</h4>
+      <div class="social-links">
+        <a href="#" aria-label="LinkedIn">in</a>
+        <a href="#" aria-label="Instagram">IG</a>
+        <a href="#" aria-label="YouTube">YT</a>
+        <a href="#" aria-label="Facebook">f</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container footer-bottom-inner">
+      <p>&copy; 2026 FlowTech. All rights reserved.</p>
+      <div class="footer-legal-links">
+        <a href="about.html#privacy">Privacy Policy</a>
+        <a href="about.html#quality">Quality Policy</a>
+        <a href="about.html#investors">Investor Relations</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="catalog.js"></script>
+<script src="shop.js"></script>
+<script src="script.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const product = getProductById(params.get('id'));
+
+  if (!product) {
+    document.querySelector('.detail-layout').innerHTML = '<p>Product not found. <a href="products.html">Back to Products</a></p>';
+  } else {
+    const name = product.name;
+    const cat = product.category;
+    const images = getProductImages(product, 600);
+
+    document.getElementById('page-title').textContent = name + ' | FlowTech';
+    document.getElementById('detail-name').textContent = name;
+    document.getElementById('detail-code').textContent = 'Product code: ' + product.code;
+    document.getElementById('detail-price').textContent = formatPrice(product.price);
+    document.getElementById('detail-cat').textContent = cat;
+    document.getElementById('detail-img').src = images[0];
+    document.getElementById('detail-img').alt = name;
+    document.getElementById('detail-desc').textContent =
+      'A ' + name.toLowerCase() + ' from our ' + (cat || 'range') + ' range, engineered for reliable, hygienic everyday performance.';
+
+    const thumbs = document.getElementById('detail-thumbs');
+    thumbs.innerHTML = images
+      .map((src, i) => `<button type="button" class="thumb-btn${i === 0 ? ' thumb-active' : ''}" data-src="${src}"><img src="${src}" alt="${name} view ${i + 1}"></button>`)
+      .join('');
+    thumbs.querySelectorAll('.thumb-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.getElementById('detail-img').src = btn.dataset.src;
+        thumbs.querySelectorAll('.thumb-btn').forEach((b) => b.classList.remove('thumb-active'));
+        btn.classList.add('thumb-active');
+      });
+    });
+
+    const stockEl = document.getElementById('detail-stock');
+    const addToCartForm = document.getElementById('add-to-cart-form');
+    const notifyForm = document.getElementById('notify-form');
+    if (product.stock) {
+      stockEl.textContent = 'In Stock';
+      stockEl.classList.add('stock-in');
+    } else {
+      stockEl.textContent = 'Out of Stock';
+      stockEl.classList.add('stock-out');
+      addToCartForm.hidden = true;
+      notifyForm.hidden = false;
+    }
+    addToCartForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      alert('Added to basket (demo only).');
+    });
+    notifyForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      alert('We will email you at ' + document.getElementById('notify-email').value + ' when this item is back in stock (demo only).');
+      notifyForm.reset();
+    });
+
+    const favBtn = document.getElementById('favorite-btn-large');
+    const favLabel = document.getElementById('favorite-label');
+    function syncFavLabel() {
+      const fav = isFavorite(product.id);
+      favBtn.classList.toggle('favorite-active', fav);
+      favLabel.textContent = fav ? 'Added to Favorites' : 'Add to Favorites';
+    }
+    syncFavLabel();
+    favBtn.addEventListener('click', () => {
+      toggleFavorite(product.id);
+      syncFavLabel();
+    });
+
+    const compareCb = document.getElementById('compare-checkbox-detail');
+    compareCb.checked = isCompared(product.id);
+    compareCb.addEventListener('change', () => {
+      const ok = toggleCompare(product.id);
+      if (ok === false) compareCb.checked = isCompared(product.id);
+    });
+
+    const catSlug = getCategorySlug(cat);
+    const breadcrumbs = document.getElementById('breadcrumbs');
+    breadcrumbs.innerHTML =
+      '<a href="index.html">Home</a><span>/</span>' +
+      '<a href="products.html">Products</a><span>/</span>' +
+      (cat ? '<a href="products.html#' + catSlug + '">' + cat + '</a><span>/</span>' : '') +
+      '<span class="current">' + name + '</span>';
+
+    const pageUrl = encodeURIComponent(window.location.href);
+    const shareText = encodeURIComponent(name + ' — FlowTech');
+    const shareButtons = document.getElementById('share-buttons');
+    shareButtons.innerHTML = `
+      <a href="https://wa.me/?text=${shareText}%20${pageUrl}" target="_blank" rel="noopener" class="share-btn" aria-label="Share on WhatsApp">WhatsApp</a>
+      <a href="https://www.facebook.com/sharer/sharer.php?u=${pageUrl}" target="_blank" rel="noopener" class="share-btn" aria-label="Share on Facebook">Facebook</a>
+      <a href="https://twitter.com/intent/tweet?text=${shareText}&url=${pageUrl}" target="_blank" rel="noopener" class="share-btn" aria-label="Share on X">X</a>
+      <a href="mailto:?subject=${shareText}&body=${pageUrl}" class="share-btn" aria-label="Share by Email">Email</a>
+      <button type="button" class="share-btn" id="copy-link-btn" aria-label="Copy link">Copy Link</button>
+    `;
+    document.getElementById('copy-link-btn')?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Link copied to clipboard.');
+      } catch {
+        alert(window.location.href);
+      }
+    });
+  }
+</script>
+</body>
+</html>
