@@ -105,6 +105,10 @@
       <a href="products.html" class="btn-outline">← Back to Products</a>
     </div>
   </div>
+  <div class="container" id="specs-wrap" hidden>
+    <h2 class="specs-heading">Technical Specifications</h2>
+    <table class="specs-table" id="specs-table"></table>
+  </div>
 </section>
 
 <footer class="site-footer">
@@ -222,6 +226,13 @@
     });
 
     document.getElementById('quote-link').href = 'quote.html?id=' + product.id;
+
+    if (product.specs) {
+      document.getElementById('specs-wrap').hidden = false;
+      document.getElementById('specs-table').innerHTML = Object.entries(product.specs)
+        .map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`)
+        .join('');
+    }
 
     const compareCb = document.getElementById('compare-checkbox-detail');
     compareCb.checked = isCompared(product.id);
