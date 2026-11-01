@@ -122,7 +122,7 @@ const CATALOG = [
       "Electrical Supply": "220/230 V",
       "Recommended Install Height": "650 mm from floor to rim"
     },
-    images: ["6045174", "1909656", "29631655"] },
+    images: ["8381831", "38321075", "34964683"] },
 ];
 
 const GBP_TO_ZAR_RATE = 24;
