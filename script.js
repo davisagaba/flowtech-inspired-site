@@ -62,9 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
     resetTimer();
   }
 
-  // Account icon (demo only — no real account system)
+  // Account icon — trade/B2B account sign-in is managed via a quote request for now
   document.getElementById('account-btn')?.addEventListener('click', () => {
-    alert('Account sign-in isn\'t available in this concept demo.');
+    window.location.href = 'quote.html';
   });
 
   // WhatsApp floating button

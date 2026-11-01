@@ -6,10 +6,8 @@ const STORAGE_KEYS = {
   compare: "vb_compare",
   cart: "vb_cart",
   recentSearches: "vb_recent_searches",
-  region: "vb_region",
+  stockNotifications: "vb_stock_notifications",
 };
-
-const REGIONS = ["United Kingdom", "Turkey", "Italy", "Germany", "France", "India", "Russia", "Global"];
 
 function readList(key) {
   try {
@@ -186,6 +184,13 @@ function updateCartCount() {
   });
 }
 
+// ---------- Stock notifications ----------
+function requestStockNotification(productId, email) {
+  const list = readList(STORAGE_KEYS.stockNotifications);
+  list.push({ productId: Number(productId), email, requestedAt: new Date().toISOString() });
+  writeList(STORAGE_KEYS.stockNotifications, list);
+}
+
 // ---------- Search ----------
 function searchCatalog(query) {
   query = query.trim().toLowerCase();
@@ -286,32 +291,8 @@ function initSearchUI() {
   });
 }
 
-// ---------- Region selector ----------
-function initRegionSelector() {
-  document.querySelectorAll(".region-select").forEach((el) => {
-    const current = localStorage.getItem(STORAGE_KEYS.region) || "United Kingdom";
-    const select = document.createElement("select");
-    select.className = "region-select-input";
-    REGIONS.forEach((r) => {
-      const opt = document.createElement("option");
-      opt.value = r;
-      opt.textContent = "Region: " + r;
-      if (r === current) opt.selected = true;
-      select.appendChild(opt);
-    });
-    select.addEventListener("change", () => {
-      try {
-        localStorage.setItem(STORAGE_KEYS.region, select.value);
-      } catch { /* ignore */ }
-      showToast("Region set to " + select.value + " (demo only — content does not change)");
-    });
-    el.replaceWith(select);
-  });
-}
-
 document.addEventListener("DOMContentLoaded", () => {
   initSearchUI();
-  initRegionSelector();
   updateFavoritesCount();
   updateCartCount();
   renderCompareBar();

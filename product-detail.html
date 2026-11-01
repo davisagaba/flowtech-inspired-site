@@ -206,7 +206,9 @@
     });
     notifyForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      alert('We will email you at ' + document.getElementById('notify-email').value + ' when this item is back in stock (demo only).');
+      const email = document.getElementById('notify-email').value;
+      requestStockNotification(product.id, email);
+      showToast("We'll email " + email + " as soon as this is back in stock.");
       notifyForm.reset();
     });
 

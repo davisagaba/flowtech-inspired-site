@@ -98,11 +98,12 @@
 <section id="showroom" class="products-section anchor-section">
   <div class="container">
     <h2>Find a Dealer</h2>
-    <p class="centered-note">Enter your city or pincode to find your nearest authorized dealer.</p>
-    <form class="showroom-form" onsubmit="event.preventDefault(); alert('Dealer search coming soon.');">
-      <input type="text" placeholder="City or pincode">
+    <p class="centered-note">Enter your city to find your nearest coverage area and contact details.</p>
+    <form class="showroom-form" id="dealer-search-form">
+      <input type="text" id="dealer-search-input" placeholder="e.g. Johannesburg, Cape Town, Durban">
       <button type="submit" class="btn-outline">Search</button>
     </form>
+    <div id="dealer-results"></div>
   </div>
 </section>
 
@@ -149,5 +150,42 @@
 <script src="catalog.js"></script>
 <script src="shop.js"></script>
 <script src="script.js"></script>
+<script>
+  const DEALER_COVERAGE = [
+    { city: "Johannesburg", region: "Gauteng" },
+    { city: "Pretoria", region: "Gauteng" },
+    { city: "Cape Town", region: "Western Cape" },
+    { city: "Durban", region: "KwaZulu-Natal" },
+    { city: "Port Elizabeth", region: "Eastern Cape" },
+    { city: "Bloemfontein", region: "Free State" },
+  ];
+
+  function renderDealerResults(query) {
+    const resultsEl = document.getElementById('dealer-results');
+    const q = query.trim().toLowerCase();
+    if (!q) { resultsEl.innerHTML = ''; return; }
+
+    const matches = DEALER_COVERAGE.filter((d) => d.city.toLowerCase().includes(q) || d.region.toLowerCase().includes(q));
+
+    if (matches.length === 0) {
+      resultsEl.innerHTML = `<p class="centered-note" style="margin-top:16px;">We don't have a listed coverage area for "${query}" yet — <a href="quote.html">request a quote</a> and we'll confirm delivery/installation to your location.</p>`;
+      return;
+    }
+
+    resultsEl.innerHTML = `
+      <ul class="dealer-list">
+        ${matches.map((d) => `
+          <li class="dealer-list-item">
+            <strong>${d.city}</strong> <span class="product-code">(${d.region})</span>
+            <p class="centered-note">We cover this area. <a href="quote.html">Request a quote</a> or contact us on WhatsApp for local installer details.</p>
+          </li>`).join('')}
+      </ul>`;
+  }
+
+  document.getElementById('dealer-search-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    renderDealerResults(document.getElementById('dealer-search-input').value);
+  });
+</script>
 </body>
 </html>

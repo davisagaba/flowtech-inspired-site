@@ -70,9 +70,11 @@
     <div class="quote-layout">
       <form class="quote-form" id="quote-form">
         <div class="quote-success" id="quote-success" hidden>
-          <h2>Request received</h2>
-          <p>Thanks, <span id="success-name"></span> — our team will get back to you within 1 business day with pricing for <strong id="success-product"></strong>.</p>
-          <a href="products.html" class="btn-outline">Continue Browsing</a>
+          <h2 id="success-heading">Request received</h2>
+          <p id="success-body">Thanks, <span id="success-name"></span> — our team will get back to you within 1 business day with pricing for <strong id="success-product"></strong>.</p>
+          <div id="success-actions">
+            <a href="products.html" class="btn-outline">Continue Browsing</a>
+          </div>
         </div>
 
         <div id="quote-fields">
@@ -111,8 +113,8 @@
           <label>Additional Requirements
             <textarea id="qmessage" rows="4" placeholder="Site details, installation needs, delivery location, etc."></textarea>
           </label>
-          <button type="submit" class="btn-cta">Submit Quote Request</button>
-          <p class="centered-note" style="margin-top:12px;">This is a concept demo — no request is actually sent, but the form fully validates and confirms as it would on a live site.</p>
+          <button type="submit" class="btn-cta" id="quote-submit-btn">Submit Quote Request</button>
+          <p class="centered-note" style="margin-top:12px;">You'll get an itemized PDF quotation immediately. Our team will also follow up within 1 business day.</p>
         </div>
       </form>
 
@@ -204,30 +206,67 @@
     fallbackWrap.hidden = false;
   }
 
-  document.getElementById('quote-form').addEventListener('submit', (e) => {
+  document.getElementById('quote-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('qname').value;
     const productSummary = quoteItems.length > 0
       ? quoteItems.map(({ qty, product }) => `${product.name} x${qty}`).join(', ')
       : (document.getElementById('qproduct').value || 'your selected products');
 
+    const payloadItems = quoteItems.length > 0
+      ? quoteItems.map(({ qty, product }) => {
+          const unitPrice = product.price * GBP_TO_ZAR_RATE * (1 + VAT_RATE);
+          return { name: product.name, code: product.code, qty, unitPrice, lineTotal: unitPrice * qty };
+        })
+      : [{ name: productSummary, code: '', qty: 1, unitPrice: 0, lineTotal: 0 }];
+
+    const submitBtn = document.getElementById('quote-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+
+    let result = null;
+    try {
+      const res = await fetch('/api/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email: document.getElementById('qemail').value,
+          phone: document.getElementById('qphone').value,
+          company: document.getElementById('qcompany').value,
+          timeline: document.getElementById('qtimeline').value,
+          message: document.getElementById('qmessage').value,
+          items: payloadItems,
+        }),
+      });
+      if (res.ok) result = await res.json();
+    } catch {
+      /* network error — handled below via result === null */
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Quote Request';
+
     document.getElementById('success-name').textContent = name;
     document.getElementById('success-product').textContent = productSummary;
     document.getElementById('quote-fields').hidden = true;
     document.getElementById('quote-success').hidden = false;
 
-    // Demo: logs what would be sent to the backend once it's wired up.
-    console.log('Quote request payload', {
-      name,
-      email: document.getElementById('qemail').value,
-      phone: document.getElementById('qphone').value,
-      company: document.getElementById('qcompany').value,
-      timeline: document.getElementById('qtimeline').value,
-      message: document.getElementById('qmessage').value,
-      items: quoteItems.map(({ qty, product }) => ({ id: product.id, name: product.name, code: product.code, qty, unitPrice: product.price })),
-    });
-
-    clearCart();
+    const actions = document.getElementById('success-actions');
+    if (result && result.ok) {
+      document.getElementById('success-heading').textContent = 'Quote ' + result.quoteNumber + ' ready';
+      actions.innerHTML = `
+        <a href="${result.pdfUrl}" class="btn-cta" target="_blank" rel="noopener">Download Your Quote PDF</a>
+        <a href="products.html" class="btn-outline">Continue Browsing</a>`;
+      clearCart();
+    } else {
+      document.getElementById('success-heading').textContent = 'Request received';
+      document.getElementById('success-body').insertAdjacentHTML('beforeend',
+        ' <br>We couldn\'t generate your PDF automatically — message us on WhatsApp and we\'ll send it directly.');
+      actions.innerHTML = `
+        <a href="https://wa.me/" target="_blank" rel="noopener" class="btn-cta">Message on WhatsApp</a>
+        <a href="products.html" class="btn-outline">Continue Browsing</a>`;
+    }
   });
 </script>
 </body>
