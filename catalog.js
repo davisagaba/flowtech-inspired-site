@@ -116,10 +116,11 @@ const CATALOG = [
 ];
 
 const GBP_TO_ZAR_RATE = 24;
+const VAT_RATE = 0.15;
 const zarFormatter = new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" });
 
 function formatPrice(basePrice) {
-  return zarFormatter.format(basePrice * GBP_TO_ZAR_RATE);
+  return zarFormatter.format(basePrice * GBP_TO_ZAR_RATE * (1 + VAT_RATE));
 }
 
 function formatPriceWithStrike(basePrice) {

@@ -70,6 +70,7 @@
       <h1 id="detail-name"></h1>
       <p class="product-code" id="detail-code"></p>
       <p class="detail-price" id="detail-price"></p>
+      <p class="vat-note">Price includes 15% VAT</p>
       <p class="stock-status" id="detail-stock"></p>
       <p class="centered-note" id="detail-desc"></p>
 
@@ -94,6 +95,8 @@
           Add to Compare
         </label>
       </div>
+
+      <a href="#" id="quote-link" class="btn-outline">Request a Quote</a>
 
       <div class="share-row">
         <span class="share-label">Share:</span>
@@ -123,6 +126,7 @@
       <a href="services.html#faq">FAQ</a>
       <a href="services.html#contact">Contact Us</a>
       <a href="services.html#showroom">Find a Dealer</a>
+      <a href="quote.html">Request a Quote</a>
     </div>
     <div class="footer-col">
       <h4>Follow Us</h4>
@@ -216,6 +220,8 @@
       toggleFavorite(product.id);
       syncFavLabel();
     });
+
+    document.getElementById('quote-link').href = 'quote.html?id=' + product.id;
 
     const compareCb = document.getElementById('compare-checkbox-detail');
     compareCb.checked = isCompared(product.id);
