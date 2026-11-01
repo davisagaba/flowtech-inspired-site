@@ -880,7 +880,9 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
 }
+.video-card { display: block; text-decoration: none; color: inherit; }
 .video-card h3 { font-size: 15px; margin-top: 12px; }
+.video-card:hover h3 { color: var(--red); }
 .video-thumb {
   position: relative;
   height: 160px;
