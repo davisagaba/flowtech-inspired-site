@@ -109,9 +109,9 @@ const CATALOG = [
   { id: 48, name: "Cubicle Lock System", category: "Accessories", price: 24, color: "Chrome", size: "", power: "", code: "FLW-106-008", stock: true,
     images: ["4238996", "4210310", "12679"] },
 
-  // Added from reference product research
-  { id: 49, name: "Plural Urinal", category: "Sensor Flushers", price: 179, color: "Matt Black", size: "Back Inlet", power: "Mains Operated", code: "FLW-104-009", stock: true,
-    desc: "Rim-ex touch-free urinal with a back inlet and vibration sensor flush, finished in matt black for a discreet, contemporary washroom.",
+  // Exact copy of reference product: vitraglobal.com/categories/plural-urinal-p-7808b083-5331
+  { id: 49, name: "Plural Urinal", category: "Sensor Flushers", price: 179, color: "Matt Black", size: "640 x 375 x 385mm", power: "Mains Operated", code: "7808B083-5331", stock: true,
+    desc: "Rim-ex Touch-Free, Back Inlet, Vibration Sensor, Mains Operated, Matt Black. Designer: Terri Pecora. Body material: FFC Fire Fine Clay. Installation: Concealed. Flushing system: Mains Supply. Syphon included. Touch-free special solution. Awarded EDIDA Turkey.",
     images: ["6045174", "1909656", "29631655"] },
 ];
 
