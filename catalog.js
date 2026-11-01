@@ -110,7 +110,7 @@ const CATALOG = [
     images: ["4238996", "4210310", "12679"] },
 
   // Exact copy of reference product: vitraglobal.com/categories/plural-urinal-p-7808b083-5331
-  { id: 49, name: "Plural Urinal", category: "Sensor Flushers", price: 179, color: "Matt Black", size: "640 x 375 x 385mm", power: "Mains Operated", code: "7808B083-5331", stock: true,
+  { id: 49, name: "Plural Urinal", category: "Sensor Flushers", price: 93.75, color: "Matt Black", size: "640 x 375 x 385mm", power: "Mains Operated", code: "7808B083-5331", stock: true,
     desc: "Rim-ex Touch-Free, Back Inlet, Vibration Sensor, Mains Operated, Matt Black. Designer: Terri Pecora. Body material: FFC Fire Fine Clay. Installation: Concealed. Flushing system: Mains Supply. Syphon included. Touch-free special solution. Awarded EDIDA Turkey.",
     images: ["6045174", "1909656", "29631655"] },
 ];
