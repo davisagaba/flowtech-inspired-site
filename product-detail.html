@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title id="page-title">Product | FlowTech</title>
+<title id="page-title">Product | Life Style Ceramics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
 <header class="site-header">
   <nav class="main-nav">
     <div class="container nav-inner">
-      <a href="index.html" class="logo">FLOWTECH</a>
+      <a href="index.html" class="logo">LIFE STYLE CERAMICS</a>
       <ul class="nav-links">
         <li class="has-megamenu"><a href="#" class="megamenu-trigger">Products</a>
           <div class="megamenu">
@@ -136,7 +136,7 @@
   </div>
   <div class="footer-bottom">
     <div class="container footer-bottom-inner">
-      <p>&copy; 2026 FlowTech. All rights reserved.</p>
+      <p>&copy; 2026 Life Style Ceramics. All rights reserved.</p>
       <div class="footer-legal-links">
         <a href="about.html#privacy">Privacy Policy</a>
         <a href="about.html#quality">Quality Policy</a>
@@ -160,7 +160,7 @@
     const cat = product.category;
     const images = getProductImages(product, 600);
 
-    document.getElementById('page-title').textContent = name + ' | FlowTech';
+    document.getElementById('page-title').textContent = name + ' | Life Style Ceramics';
     document.getElementById('detail-name').textContent = name;
     document.getElementById('detail-code').textContent = 'Product code: ' + product.code;
     document.getElementById('detail-price').textContent = formatPrice(product.price);
@@ -233,7 +233,7 @@
       '<span class="current">' + name + '</span>';
 
     const pageUrl = encodeURIComponent(window.location.href);
-    const shareText = encodeURIComponent(name + ' — FlowTech');
+    const shareText = encodeURIComponent(name + ' — Life Style Ceramics');
     const shareButtons = document.getElementById('share-buttons');
     shareButtons.innerHTML = `
       <a href="https://wa.me/?text=${shareText}%20${pageUrl}" target="_blank" rel="noopener" class="share-btn" aria-label="Share on WhatsApp">WhatsApp</a>
