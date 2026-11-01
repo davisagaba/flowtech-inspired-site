@@ -201,7 +201,8 @@
     }
     addToCartForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      alert('Added to basket (demo only).');
+      const qty = Number(document.getElementById('qty').value) || 1;
+      addToCart(product.id, qty);
     });
     notifyForm.addEventListener('submit', (e) => {
       e.preventDefault();

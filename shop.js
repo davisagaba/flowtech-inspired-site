@@ -4,6 +4,7 @@
 const STORAGE_KEYS = {
   favorites: "vb_favorites",
   compare: "vb_compare",
+  cart: "vb_cart",
   recentSearches: "vb_recent_searches",
   region: "vb_region",
 };
@@ -126,6 +127,62 @@ function renderCompareBar() {
     writeList(STORAGE_KEYS.compare, []);
     document.querySelectorAll(".compare-checkbox").forEach((cb) => (cb.checked = false));
     renderCompareBar();
+  });
+}
+
+// ---------- Cart ----------
+function getCart() {
+  return readList(STORAGE_KEYS.cart);
+}
+function setCart(cart) {
+  writeList(STORAGE_KEYS.cart, cart);
+  updateCartCount();
+}
+function getCartCount() {
+  return getCart().reduce((sum, item) => sum + item.qty, 0);
+}
+function addToCart(id, qty) {
+  id = Number(id);
+  qty = Math.max(1, Number(qty) || 1);
+  const cart = getCart();
+  const existing = cart.find((item) => item.id === id);
+  if (existing) {
+    existing.qty += qty;
+  } else {
+    cart.push({ id, qty });
+  }
+  setCart(cart);
+  showToast("Added to basket");
+}
+function updateCartItemQty(id, qty) {
+  id = Number(id);
+  qty = Math.max(1, Number(qty) || 1);
+  const cart = getCart();
+  const existing = cart.find((item) => item.id === id);
+  if (existing) {
+    existing.qty = qty;
+    setCart(cart);
+  }
+}
+function removeFromCart(id) {
+  id = Number(id);
+  setCart(getCart().filter((item) => item.id !== id));
+}
+function clearCart() {
+  setCart([]);
+}
+function getCartItemsWithProducts() {
+  return getCart()
+    .map((item) => ({ ...item, product: getProductById(item.id) }))
+    .filter((item) => item.product);
+}
+function getCartTotal() {
+  return getCartItemsWithProducts().reduce((sum, item) => sum + item.product.price * item.qty, 0);
+}
+function updateCartCount() {
+  const count = getCartCount();
+  document.querySelectorAll(".cart-count").forEach((el) => {
+    el.textContent = count;
   });
 }
 
@@ -256,5 +313,10 @@ document.addEventListener("DOMContentLoaded", () => {
   initSearchUI();
   initRegionSelector();
   updateFavoritesCount();
+  updateCartCount();
   renderCompareBar();
+
+  document.getElementById("cart-btn")?.addEventListener("click", () => {
+    window.location.href = "basket.html";
+  });
 });

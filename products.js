@@ -188,7 +188,10 @@ function renderGrid() {
           <input type="checkbox" class="compare-checkbox" data-id="${p.id}" ${compared ? "checked" : ""}>
           Compare
         </label>
-        <a href="product-detail.html?id=${p.id}" class="btn-outline small">View Item</a>
+        <div class="card-actions-row">
+          <a href="product-detail.html?id=${p.id}" class="btn-outline small">View Item</a>
+          ${p.stock ? `<button type="button" class="btn-cta small add-to-cart-btn" data-id="${p.id}">Add to Basket</button>` : ""}
+        </div>
       </article>`;
     })
     .join("");
@@ -201,6 +204,9 @@ function renderGrid() {
       const ok = toggleCompare(cb.dataset.id);
       if (ok === false) cb.checked = isCompared(cb.dataset.id);
     });
+  });
+  grid.querySelectorAll(".add-to-cart-btn").forEach((btn) => {
+    btn.addEventListener("click", () => addToCart(btn.dataset.id, 1));
   });
 
   renderPagination(totalPages);

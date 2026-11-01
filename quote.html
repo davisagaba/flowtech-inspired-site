@@ -92,22 +92,22 @@
               <input type="tel" id="qphone">
             </label>
           </div>
-          <label>Product
+          <div id="quote-items-wrap">
+            <h3 class="quote-items-heading">Items in this request</h3>
+            <table class="specs-table" id="quote-items-table"></table>
+            <p class="quote-items-total" id="quote-items-total"></p>
+          </div>
+          <label id="qproduct-fallback-wrap" hidden>Product
             <input type="text" id="qproduct" placeholder="e.g. Plural Urinal">
           </label>
-          <div class="form-row">
-            <label>Quantity
-              <input type="number" id="qqty" min="1" value="1">
-            </label>
-            <label>When do you need this by?
-              <select id="qtimeline">
-                <option>Just researching</option>
-                <option>Within 1 month</option>
-                <option>Within 3 months</option>
-                <option>Urgent</option>
-              </select>
-            </label>
-          </div>
+          <label>When do you need this by?
+            <select id="qtimeline">
+              <option>Just researching</option>
+              <option>Within 1 month</option>
+              <option>Within 3 months</option>
+              <option>Urgent</option>
+            </select>
+          </label>
           <label>Additional Requirements
             <textarea id="qmessage" rows="4" placeholder="Site details, installation needs, delivery location, etc."></textarea>
           </label>
@@ -175,19 +175,59 @@
 <script>
   const params = new URLSearchParams(window.location.search);
   const presetId = params.get('id');
-  if (presetId) {
+
+  let quoteItems = getCartItemsWithProducts();
+  if (quoteItems.length === 0 && presetId) {
     const product = getProductById(presetId);
-    if (product) document.getElementById('qproduct').value = product.name + ' (' + product.code + ')';
+    if (product) quoteItems = [{ id: product.id, qty: 1, product }];
+  }
+
+  const itemsWrap = document.getElementById('quote-items-wrap');
+  const fallbackWrap = document.getElementById('qproduct-fallback-wrap');
+
+  if (quoteItems.length > 0) {
+    fallbackWrap.hidden = true;
+    document.getElementById('quote-items-table').innerHTML = quoteItems
+      .map(({ qty, product }) => `
+        <tr>
+          <th>${product.name} <span class="product-code">(${product.code})</span></th>
+          <td>Qty ${qty} &times; ${formatPrice(product.price)} = <strong>${formatPrice(product.price * qty)}</strong></td>
+        </tr>`)
+      .join('');
+    const subtotal = quoteItems.reduce((sum, { qty, product }) => sum + product.price * qty, 0);
+    const baseZar = subtotal * GBP_TO_ZAR_RATE;
+    const totalZar = baseZar * (1 + VAT_RATE);
+    document.getElementById('quote-items-total').textContent =
+      'Total (incl. 15% VAT): ' + zarFormatter.format(totalZar);
+  } else {
+    itemsWrap.hidden = true;
+    fallbackWrap.hidden = false;
   }
 
   document.getElementById('quote-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const name = document.getElementById('qname').value;
-    const product = document.getElementById('qproduct').value || 'your selected products';
+    const productSummary = quoteItems.length > 0
+      ? quoteItems.map(({ qty, product }) => `${product.name} x${qty}`).join(', ')
+      : (document.getElementById('qproduct').value || 'your selected products');
+
     document.getElementById('success-name').textContent = name;
-    document.getElementById('success-product').textContent = product;
+    document.getElementById('success-product').textContent = productSummary;
     document.getElementById('quote-fields').hidden = true;
     document.getElementById('quote-success').hidden = false;
+
+    // Demo: logs what would be sent to the backend once it's wired up.
+    console.log('Quote request payload', {
+      name,
+      email: document.getElementById('qemail').value,
+      phone: document.getElementById('qphone').value,
+      company: document.getElementById('qcompany').value,
+      timeline: document.getElementById('qtimeline').value,
+      message: document.getElementById('qmessage').value,
+      items: quoteItems.map(({ qty, product }) => ({ id: product.id, name: product.name, code: product.code, qty, unitPrice: product.price })),
+    });
+
+    clearCart();
   });
 </script>
 </body>

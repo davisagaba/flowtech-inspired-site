@@ -62,10 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resetTimer();
   }
 
-  // Cart / account icons (demo only — no real cart/account system)
-  document.getElementById('cart-btn')?.addEventListener('click', () => {
-    alert('Your cart is empty (demo only).');
-  });
+  // Account icon (demo only — no real account system)
   document.getElementById('account-btn')?.addEventListener('click', () => {
     alert('Account sign-in isn\'t available in this concept demo.');
   });
