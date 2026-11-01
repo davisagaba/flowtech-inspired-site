@@ -168,7 +168,7 @@
     document.getElementById('detail-img').src = images[0];
     document.getElementById('detail-img').alt = name;
     document.getElementById('detail-desc').textContent =
-      'A ' + name.toLowerCase() + ' from our ' + (cat || 'range') + ' range, engineered for reliable, hygienic everyday performance.';
+      product.desc || ('A ' + name.toLowerCase() + ' from our ' + (cat || 'range') + ' range, engineered for reliable, hygienic everyday performance.');
 
     const thumbs = document.getElementById('detail-thumbs');
     thumbs.innerHTML = images

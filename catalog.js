@@ -108,6 +108,11 @@ const CATALOG = [
     images: ["7262767", "12679", "4210310"] },
   { id: 48, name: "Cubicle Lock System", category: "Accessories", price: 24, color: "Chrome", size: "", power: "", code: "FLW-106-008", stock: true,
     images: ["4238996", "4210310", "12679"] },
+
+  // Added from reference product research
+  { id: 49, name: "Plural Urinal", category: "Sensor Flushers", price: 179, color: "Matt Black", size: "Back Inlet", power: "Mains Operated", code: "FLW-104-009", stock: true,
+    desc: "Rim-ex touch-free urinal with a back inlet and vibration sensor flush, finished in matt black for a discreet, contemporary washroom.",
+    images: ["6045174", "1909656", "29631655"] },
 ];
 
 const GBP_TO_ZAR_RATE = 24;
