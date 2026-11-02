@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title id="page-title">Product | Life Style Ceramics</title>
+<meta id="meta-description" name="description" content="Shop washroom automation and entrance solutions at Life Style Ceramics.">
+<link id="canonical-link" rel="canonical" href="https://lyfestyleceramics.co.za/product-detail.html">
+<meta property="og:type" content="product">
+<meta id="og-title" property="og:title" content="Product | Life Style Ceramics">
+<meta id="og-description" property="og:description" content="">
+<meta id="og-url" property="og:url" content="">
+<meta id="og-image" property="og:image" content="">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json" id="product-schema"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -173,8 +182,38 @@
     document.getElementById('detail-cat').textContent = cat;
     document.getElementById('detail-img').src = images[0];
     document.getElementById('detail-img').alt = name;
-    document.getElementById('detail-desc').textContent =
-      product.desc || ('A ' + name.toLowerCase() + ' from our ' + (cat || 'range') + ' range, engineered for reliable, hygienic everyday performance.');
+    const descText = product.desc || ('A ' + name.toLowerCase() + ' from our ' + (cat || 'range') + ' range, engineered for reliable, hygienic everyday performance.');
+    document.getElementById('detail-desc').textContent = descText;
+
+    // --- SEO: meta description, canonical, Open Graph, JSON-LD Product schema ---
+    const pageUrlAbs = 'https://lyfestyleceramics.co.za/product-detail.html?id=' + product.id;
+    const metaDesc = `${name} (${product.code}) — ${descText} ${formatPrice(product.price)}. ${product.stock ? 'In stock' : 'Out of stock'} at Life Style Ceramics.`.slice(0, 300);
+    document.getElementById('meta-description').setAttribute('content', metaDesc);
+    document.getElementById('canonical-link').setAttribute('href', pageUrlAbs);
+    document.getElementById('og-title').setAttribute('content', name + ' | Life Style Ceramics');
+    document.getElementById('og-description').setAttribute('content', metaDesc);
+    document.getElementById('og-url').setAttribute('content', pageUrlAbs);
+    document.getElementById('og-image').setAttribute('content', images[0]);
+
+    const finalPrice = (product.price * GBP_TO_ZAR_RATE * (1 + VAT_RATE)).toFixed(2);
+    const productSchema = {
+      '@context': 'https://schema.org/',
+      '@type': 'Product',
+      name: name,
+      sku: product.code,
+      description: descText,
+      image: images,
+      category: cat,
+      offers: {
+        '@type': 'Offer',
+        url: pageUrlAbs,
+        priceCurrency: 'ZAR',
+        price: finalPrice,
+        availability: product.stock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        itemCondition: 'https://schema.org/NewCondition',
+      },
+    };
+    document.getElementById('product-schema').textContent = JSON.stringify(productSchema);
 
     const thumbs = document.getElementById('detail-thumbs');
     thumbs.innerHTML = images
