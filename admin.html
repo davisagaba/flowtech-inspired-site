@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Poppins', Arial, sans-serif; background: #f3f4f2; margin: 0; padding: 24px; color: #15181a; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .muted { color: #6b7074; font-size: 13px; }
+  #login-box { max-width: 320px; margin: 80px auto; background: #fff; padding: 32px; border-radius: 16px; }
+  #login-box input { width: 100%; padding: 10px 12px; border: 1px solid #e2e4e1; border-radius: 10px; margin-bottom: 12px; font-family: inherit; }
+  #login-box button, .btn { background: #0d5559; color: #fff; border: none; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: inherit; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+  .card { background: #fff; border-radius: 14px; padding: 16px 20px; }
+  .card .num { font-size: 26px; font-weight: 800; color: #0d5559; }
+  .card .label { font-size: 12px; color: #6b7074; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 14px; overflow: hidden; margin-bottom: 24px; }
+  th, td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid #eee; }
+  th { background: #f8f8f7; font-weight: 700; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fde9a8; color: #7a5b00; }
+  .pill.done { background: #d6f0e0; color: #0d5559; }
+  section { margin-bottom: 32px; }
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="login-box">
+  <h1>Admin Login</h1>
+  <p class="muted" style="margin-bottom:16px;">Life Style Ceramics dashboard</p>
+  <input type="password" id="pw-input" placeholder="Admin password">
+  <button onclick="login()" style="width:100%;">Sign In</button>
+  <p class="muted" id="login-error" style="margin-top:10px;color:#c0392b;"></p>
+</div>
+
+<div id="app">
+  <div class="wrap">
+    <h1>Life Style Ceramics — Dashboard</h1>
+    <p class="muted" id="refreshed"></p>
+
+    <section>
+      <h2 style="font-size:16px;">Visitors (last 7 days)</h2>
+      <div class="cards" id="summary-cards"></div>
+    </section>
+
+    <section>
+      <h2 style="font-size:16px;">Top Pages (all time)</h2>
+      <table id="top-pages-table"><thead><tr><th>Page</th><th>Views</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section>
+      <h2 style="font-size:16px;">Quote Requests</h2>
+      <table id="quotes-table">
+        <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2 style="font-size:16px;">Recent Page Views</h2>
+      <table id="recent-views-table"><thead><tr><th>Time</th><th>Page</th><th>Referrer</th><th>IP</th></tr></thead><tbody></tbody></table>
+    </section>
+  </div>
+</div>
+
+<script>
+  function fmtZAR(n) {
+    return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n || 0);
+  }
+
+  function login() {
+    const pw = document.getElementById('pw-input').value;
+    fetch('/api/analytics?password=' + encodeURIComponent(pw))
+      .then((r) => { if (!r.ok) throw new Error('bad'); return r.json(); })
+      .then((data) => {
+        sessionStorage.setItem('lsc_admin_pw', pw);
+        document.getElementById('login-box').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        render(data);
+      })
+      .catch(() => {
+        document.getElementById('login-error').textContent = 'Incorrect password.';
+      });
+  }
+
+  function render(data) {
+    document.getElementById('refreshed').textContent = 'Updated ' + new Date().toLocaleString('en-ZA');
+
+    document.getElementById('summary-cards').innerHTML = `
+      <div class="card"><div class="num">${data.last7d.totalViews}</div><div class="label">Page views</div></div>
+      <div class="card"><div class="num">${data.last7d.uniqueVisitors}</div><div class="label">Unique visitors</div></div>
+      <div class="card"><div class="num">${data.allTime.totalViews}</div><div class="label">All-time views</div></div>
+      <div class="card"><div class="num">${data.quoteRequests.length}</div><div class="label">Quote requests</div></div>
+    `;
+
+    document.querySelector('#top-pages-table tbody').innerHTML = data.allTime.topPages
+      .map((p) => `<tr><td>${p.path}</td><td>${p.count}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">No data yet</td></tr>';
+
+    document.querySelector('#quotes-table tbody').innerHTML = data.quoteRequests
+      .map((q) => `<tr>
+        <td>${q.quoteNumber}</td>
+        <td>${new Date(q.date).toLocaleString('en-ZA')}</td>
+        <td>${q.name || ''}</td>
+        <td>${q.email || ''}</td>
+        <td>${q.phone || ''}</td>
+        <td>${(q.items || []).map((it) => it.name + ' x' + it.qty).join(', ')}</td>
+        <td>${fmtZAR(q.grandTotal)}</td>
+        <td><span class="pill ${q.status === 'pending_review' ? '' : 'done'}">${q.status || 'received'}</span></td>
+      </tr>`).join('') || '<tr><td colspan="8" class="muted">No quote requests yet</td></tr>';
+
+    document.querySelector('#recent-views-table tbody').innerHTML = data.recentViews
+      .map((v) => `<tr>
+        <td>${new Date(v.ts).toLocaleString('en-ZA')}</td>
+        <td>${v.path}</td>
+        <td>${v.referrer || '—'}</td>
+        <td>${v.ip || ''}</td>
+      </tr>`).join('') || '<tr><td colspan="4" class="muted">No data yet</td></tr>';
+  }
+
+  // Auto-login if password already stored in this session
+  const stored = sessionStorage.getItem('lsc_admin_pw');
+  if (stored) {
+    document.getElementById('pw-input').value = stored;
+    login();
+  }
+</script>
+</body>
+</html>

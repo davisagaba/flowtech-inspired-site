@@ -114,7 +114,7 @@
             <textarea id="qmessage" rows="4" placeholder="Site details, installation needs, delivery location, etc."></textarea>
           </label>
           <button type="submit" class="btn-cta" id="quote-submit-btn">Submit Quote Request</button>
-          <p class="centered-note" style="margin-top:12px;">You'll get an itemized PDF quotation immediately. Our team will also follow up within 1 business day.</p>
+          <p class="centered-note" style="margin-top:12px;">Our team will review your request and send your itemized quotation within 1 business day.</p>
         </div>
       </form>
 
@@ -171,6 +171,7 @@
   </div>
 </footer>
 
+<script src="track.js"></script>
 <script src="catalog.js"></script>
 <script src="shop.js"></script>
 <script src="script.js"></script>
@@ -254,15 +255,16 @@
 
     const actions = document.getElementById('success-actions');
     if (result && result.ok) {
-      document.getElementById('success-heading').textContent = 'Quote ' + result.quoteNumber + ' ready';
+      document.getElementById('success-heading').textContent = 'Request ' + result.quoteNumber + ' received';
+      document.getElementById('success-body').insertAdjacentHTML('beforeend',
+        ' Our team will review your request and send your itemized quotation to your email within 1 business day.');
       actions.innerHTML = `
-        <a href="${result.pdfUrl}" class="btn-cta" target="_blank" rel="noopener">Download Your Quote PDF</a>
         <a href="products.html" class="btn-outline">Continue Browsing</a>`;
       clearCart();
     } else {
       document.getElementById('success-heading').textContent = 'Request received';
       document.getElementById('success-body').insertAdjacentHTML('beforeend',
-        ' <br>We couldn\'t generate your PDF automatically — message us on WhatsApp and we\'ll send it directly.');
+        ' We couldn\'t confirm this automatically — message us on WhatsApp and we\'ll follow up directly.');
       actions.innerHTML = `
         <a href="https://wa.me/" target="_blank" rel="noopener" class="btn-cta">Message on WhatsApp</a>
         <a href="products.html" class="btn-outline">Continue Browsing</a>`;
