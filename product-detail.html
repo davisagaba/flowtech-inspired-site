@@ -175,7 +175,8 @@
     const cat = product.category;
     const images = getProductImages(product, 600);
 
-    document.getElementById('page-title').textContent = name + ' | Life Style Ceramics';
+    const seoTitle = name + ' — ' + cat + ' | Life Style Ceramics South Africa';
+    document.getElementById('page-title').textContent = seoTitle;
     document.getElementById('detail-name').textContent = name;
     document.getElementById('detail-code').textContent = 'Product code: ' + product.code;
     document.getElementById('detail-price').textContent = formatPrice(product.price);
@@ -185,12 +186,12 @@
     const descText = product.desc || ('A ' + name.toLowerCase() + ' from our ' + (cat || 'range') + ' range, engineered for reliable, hygienic everyday performance.');
     document.getElementById('detail-desc').textContent = descText;
 
-    // --- SEO: meta description, canonical, Open Graph, JSON-LD Product schema ---
+    // --- SEO: meta description, canonical, Open Graph, JSON-LD Product + Breadcrumb schema ---
     const pageUrlAbs = 'https://lyfestyleceramics.co.za/product-detail.html?id=' + product.id;
-    const metaDesc = `${name} (${product.code}) — ${descText} ${formatPrice(product.price)}. ${product.stock ? 'In stock' : 'Out of stock'} at Life Style Ceramics.`.slice(0, 300);
+    const metaDesc = `${name} (${product.code}) — ${descText} ${formatPrice(product.price)}. ${product.stock ? 'In stock' : 'Out of stock'}, shipped across South Africa by Life Style Ceramics.`.slice(0, 300);
     document.getElementById('meta-description').setAttribute('content', metaDesc);
     document.getElementById('canonical-link').setAttribute('href', pageUrlAbs);
-    document.getElementById('og-title').setAttribute('content', name + ' | Life Style Ceramics');
+    document.getElementById('og-title').setAttribute('content', seoTitle);
     document.getElementById('og-description').setAttribute('content', metaDesc);
     document.getElementById('og-url').setAttribute('content', pageUrlAbs);
     document.getElementById('og-image').setAttribute('content', images[0]);
@@ -204,6 +205,7 @@
       description: descText,
       image: images,
       category: cat,
+      brand: { '@type': 'Brand', name: 'Life Style Ceramics' },
       offers: {
         '@type': 'Offer',
         url: pageUrlAbs,
@@ -211,9 +213,26 @@
         price: finalPrice,
         availability: product.stock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
         itemCondition: 'https://schema.org/NewCondition',
+        areaServed: 'ZA',
       },
     };
     document.getElementById('product-schema').textContent = JSON.stringify(productSchema);
+
+    const catSlugForBreadcrumb = getCategorySlug(cat);
+    const breadcrumbSchema = {
+      '@context': 'https://schema.org/',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://lyfestyleceramics.co.za/' },
+        { '@type': 'ListItem', position: 2, name: 'Products', item: 'https://lyfestyleceramics.co.za/products.html' },
+        { '@type': 'ListItem', position: 3, name: cat, item: 'https://lyfestyleceramics.co.za/products.html#' + catSlugForBreadcrumb },
+        { '@type': 'ListItem', position: 4, name: name, item: pageUrlAbs },
+      ],
+    };
+    const breadcrumbScript = document.createElement('script');
+    breadcrumbScript.type = 'application/ld+json';
+    breadcrumbScript.textContent = JSON.stringify(breadcrumbSchema);
+    document.head.appendChild(breadcrumbScript);
 
     const thumbs = document.getElementById('detail-thumbs');
     thumbs.innerHTML = images
