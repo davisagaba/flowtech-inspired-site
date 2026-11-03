@@ -65,6 +65,9 @@
   .mail-meta { font-size: 12px; color: #6b7074; margin-bottom: 14px; }
   .mail-body { font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
   .mail-empty { padding: 40px 20px; text-align: center; color: #aaa; font-size: 13px; }
+  .unread-badge { display: inline-block; background: #c0392b; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
+  .unread-badge:empty { display: none; }
+  .reply-btn { margin-top: 16px; }
 
   .panel-tabs { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; border-bottom: 1px solid #e2e4e1; padding-bottom: 0; }
   .panel-tab { background: none; border: none; padding: 10px 18px; font-size: 14px; font-weight: 600; color: #6b7074; cursor: pointer; font-family: inherit; border-bottom: 3px solid transparent; margin-bottom: -1px; }
@@ -107,12 +110,16 @@
       <section>
         <div class="section-head">
           <h2 style="font-size:16px;margin:0;">Email — sales@lyfestyleceramics.co.za</h2>
-          <button class="btn" style="padding:8px 16px;font-size:12px;" onclick="loadMail(currentMailFolder)">Refresh</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-outline-sm" onclick="loadMail(currentMailFolder)">Refresh</button>
+            <button class="btn" style="padding:8px 16px;font-size:12px;" onclick="openCompose()">+ Compose</button>
+          </div>
         </div>
         <div class="mail-tabs">
-          <button class="mail-tab active" id="tab-inbox" onclick="switchMailTab('inbox')">Inbox</button>
+          <button class="mail-tab active" id="tab-inbox" onclick="switchMailTab('inbox')">Inbox <span class="unread-badge" id="inbox-unread-badge"></span></button>
           <button class="mail-tab" id="tab-outbox" onclick="switchMailTab('outbox')">Outbox</button>
         </div>
+        <input type="text" id="mail-search" class="form-row" style="width:100%;padding:9px 11px;border:1px solid #e2e4e1;border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:10px;" placeholder="Search by sender, subject or content…" oninput="renderMailList()">
         <div class="unibox">
           <div class="mail-list" id="mail-list">
             <div class="mail-empty">Loading…</div>
@@ -156,6 +163,30 @@
         <h2 style="font-size:16px;">Recent Page Views</h2>
         <table id="recent-views-table"><thead><tr><th>Time</th><th>Page</th><th>Referrer</th><th>IP</th></tr></thead><tbody></tbody></table>
       </section>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="compose-modal">
+  <div class="modal">
+    <h3 id="compose-modal-title">Compose Email</h3>
+    <input type="hidden" id="c-in-reply-to">
+    <div class="form-row">
+      <label>To</label>
+      <input type="email" id="c-to" placeholder="customer@example.com">
+    </div>
+    <div class="form-row">
+      <label>Subject</label>
+      <input type="text" id="c-subject" placeholder="Subject">
+    </div>
+    <div class="form-row">
+      <label>Message</label>
+      <textarea id="c-body" style="min-height:180px;" placeholder="Write your message…"></textarea>
+    </div>
+    <p class="muted" id="compose-status"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeCompose()">Cancel</button>
+      <button class="btn" onclick="sendCompose()">Send</button>
     </div>
   </div>
 </div>
@@ -467,18 +498,28 @@
   // ---------- Unibox: real Inbox/Outbox pulled live via IMAP ----------
   let currentMailFolder = 'inbox';
   let currentMailMessages = [];
+  let currentMailSearch = '';
+  let openMailIndex = null;
 
   function switchMailTab(folder) {
     currentMailFolder = folder;
+    currentMailSearch = '';
+    document.getElementById('mail-search').value = '';
     document.getElementById('tab-inbox').classList.toggle('active', folder === 'inbox');
     document.getElementById('tab-outbox').classList.toggle('active', folder === 'outbox');
     document.getElementById('mail-reading-pane').innerHTML = '<div class="mail-empty">Select a message to read it</div>';
+    openMailIndex = null;
     loadMail(folder);
   }
 
   function fmtMailDate(iso) {
     const d = new Date(iso);
     return isNaN(d) ? '' : d.toLocaleString('en-ZA', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function updateUnreadBadge() {
+    const count = currentMailFolder === 'inbox' ? currentMailMessages.filter((m) => !m.seen).length : 0;
+    document.getElementById('inbox-unread-badge').textContent = count > 0 ? count : '';
   }
 
   function loadMail(folder) {
@@ -489,25 +530,43 @@
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Failed to load mailbox');
         currentMailMessages = data.messages || [];
-        if (currentMailMessages.length === 0) {
-          list.innerHTML = '<div class="mail-empty">No messages</div>';
-          return;
-        }
-        list.innerHTML = currentMailMessages.map((m, i) => `
-          <div class="mail-row ${m.seen ? '' : 'unread'}" data-i="${i}" onclick="openMailMessage(${i})">
-            <div class="mail-from">${(folder === 'inbox' ? m.from : m.to) || '(unknown)'}</div>
-            <div class="mail-subject">${m.subject}</div>
-            <div class="mail-snippet">${m.snippet || ''}</div>
-            <div class="mail-date">${fmtMailDate(m.date)}</div>
-          </div>
-        `).join('');
+        if (folder === 'inbox') updateUnreadBadge();
+        renderMailList();
       })
       .catch((err) => {
         list.innerHTML = '<div class="mail-empty">Could not load mail: ' + err.message + '</div>';
       });
   }
 
+  function renderMailList() {
+    currentMailSearch = document.getElementById('mail-search').value.trim().toLowerCase();
+    const list = document.getElementById('mail-list');
+    const folder = currentMailFolder;
+    const filtered = currentMailMessages
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => {
+        if (!currentMailSearch) return true;
+        const haystack = `${m.from} ${m.to} ${m.subject} ${m.snippet}`.toLowerCase();
+        return haystack.includes(currentMailSearch);
+      });
+
+    if (filtered.length === 0) {
+      list.innerHTML = `<div class="mail-empty">${currentMailMessages.length === 0 ? 'No messages' : 'No matches'}</div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(({ m, i }) => `
+      <div class="mail-row ${m.seen ? '' : 'unread'} ${i === openMailIndex ? 'active' : ''}" data-i="${i}" onclick="openMailMessage(${i})">
+        <div class="mail-from">${(folder === 'inbox' ? m.from : m.to) || '(unknown)'}</div>
+        <div class="mail-subject">${m.subject}</div>
+        <div class="mail-snippet">${m.snippet || ''}</div>
+        <div class="mail-date">${fmtMailDate(m.date)}</div>
+      </div>
+    `).join('');
+  }
+
   function openMailMessage(i) {
+    openMailIndex = i;
     document.querySelectorAll('.mail-row').forEach((row) => row.classList.remove('active'));
     document.querySelector(`.mail-row[data-i="${i}"]`)?.classList.add('active');
     const m = currentMailMessages[i];
@@ -519,7 +578,74 @@
         ${fmtMailDate(m.date)}
       </div>
       <div class="mail-body">${(m.body || '').replace(/</g, '&lt;') || '(no content)'}</div>
+      ${currentMailFolder === 'inbox' ? `<button class="btn reply-btn" onclick="openReply(${i})">Reply</button>` : ''}
     `;
+
+    if (currentMailFolder === 'inbox' && !m.seen) {
+      fetch('/api/admin/mailbox/mark-read?password=' + encodeURIComponent(adminPw()), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: 'INBOX', uid: m.uid }),
+      }).then(() => {
+        m.seen = true;
+        updateUnreadBadge();
+        renderMailList();
+        document.querySelector(`.mail-row[data-i="${i}"]`)?.classList.add('active');
+      }).catch(() => {});
+    }
+  }
+
+  // ---------- Compose / Reply ----------
+  function openCompose() {
+    document.getElementById('compose-modal-title').textContent = 'Compose Email';
+    document.getElementById('c-in-reply-to').value = '';
+    document.getElementById('c-to').value = '';
+    document.getElementById('c-subject').value = '';
+    document.getElementById('c-body').value = '';
+    document.getElementById('compose-status').textContent = '';
+    document.getElementById('compose-modal').classList.add('open');
+  }
+
+  function openReply(i) {
+    const m = currentMailMessages[i];
+    document.getElementById('compose-modal-title').textContent = 'Reply';
+    document.getElementById('c-in-reply-to').value = m.messageId || '';
+    document.getElementById('c-to').value = m.fromAddress || '';
+    document.getElementById('c-subject').value = /^re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject;
+    document.getElementById('c-body').value = `\n\n---\nOn ${fmtMailDate(m.date)}, ${m.from} wrote:\n${(m.body || '').split('\n').map((l) => '> ' + l).join('\n')}`;
+    document.getElementById('compose-status').textContent = '';
+    document.getElementById('compose-modal').classList.add('open');
+  }
+
+  function closeCompose() {
+    document.getElementById('compose-modal').classList.remove('open');
+  }
+
+  function sendCompose() {
+    const to = document.getElementById('c-to').value.trim();
+    const subject = document.getElementById('c-subject').value.trim();
+    const body = document.getElementById('c-body').value;
+    const inReplyTo = document.getElementById('c-in-reply-to').value || undefined;
+    if (!to || !subject || !body.trim()) {
+      document.getElementById('compose-status').textContent = 'To, subject and message are all required.';
+      return;
+    }
+    const status = document.getElementById('compose-status');
+    status.textContent = 'Sending…';
+    fetch('/api/admin/mailbox/send?password=' + encodeURIComponent(adminPw()), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body, inReplyTo }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Send failed');
+        closeCompose();
+        if (currentMailFolder === 'outbox') loadMail('outbox');
+      })
+      .catch((err) => {
+        status.textContent = 'Error: ' + err.message;
+      });
   }
 
   // Auto-login if password already stored in this session

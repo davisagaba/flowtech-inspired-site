@@ -66,10 +66,12 @@ async function fetchMailbox(folder, limit) {
           messages.push({
             uid: msg.uid,
             from: msg.envelope.from && msg.envelope.from[0] ? `${msg.envelope.from[0].name || ''} <${msg.envelope.from[0].address}>`.trim() : '',
+            fromAddress: msg.envelope.from && msg.envelope.from[0] ? msg.envelope.from[0].address : '',
             to: msg.envelope.to && msg.envelope.to[0] ? msg.envelope.to[0].address : '',
             subject: msg.envelope.subject || '(no subject)',
             date: msg.envelope.date,
             seen: msg.flags.has('\\Seen'),
+            messageId: msg.envelope.messageId || '',
             snippet,
             body,
           });
@@ -527,6 +529,73 @@ app.get('/admin/mailbox/outbox', requireAdmin, async (req, res) => {
     res.json({ ok: true, messages, folder });
   } catch (err) {
     console.error('Outbox fetch error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Send a new email (compose, or reply when inReplyTo/references are given),
+// and append a copy into the Sent folder so Outbox reflects it immediately
+// (GoDaddy's SMTP relay does not auto-save sent mail like Gmail/M365 do).
+app.post('/admin/mailbox/send', requireAdmin, async (req, res) => {
+  try {
+    const { to, subject, body, inReplyTo, references } = req.body || {};
+    if (!to || !subject || !body) {
+      return res.status(400).json({ ok: false, error: 'Missing to, subject or body.' });
+    }
+
+    const mailOptions = {
+      from: `"Life Style Ceramics" <${process.env.LSC_SMTP_USER}>`,
+      to,
+      subject,
+      text: body,
+      ...(inReplyTo ? { inReplyTo, references: references || inReplyTo } : {}),
+    };
+
+    await mailer.sendMail(mailOptions);
+
+    try {
+      const MailComposer = require('nodemailer/lib/mail-composer');
+      const raw = await new MailComposer(mailOptions).compile().build();
+      const folder = await findSentFolder();
+      const client = imapClient();
+      await client.connect();
+      try {
+        await client.append(folder, raw, ['\\Seen']);
+      } finally {
+        await client.logout().catch(() => {});
+      }
+    } catch (appendErr) {
+      // Non-fatal — the email was sent either way, it just won't show in
+      // Outbox until the mail server's own copy (if any) syncs.
+      console.warn('Sent-folder append failed:', appendErr.message);
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Mailbox send error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/admin/mailbox/mark-read', requireAdmin, async (req, res) => {
+  try {
+    const { folder, uid } = req.body || {};
+    if (!folder || !uid) return res.status(400).json({ ok: false, error: 'Missing folder or uid.' });
+    const client = imapClient();
+    await client.connect();
+    try {
+      const lock = await client.getMailboxLock(folder);
+      try {
+        await client.messageFlagsAdd({ uid: String(uid) }, ['\\Seen'], { uid: true });
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout().catch(() => {});
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Mark-read error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
