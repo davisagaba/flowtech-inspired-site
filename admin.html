@@ -74,7 +74,7 @@
         <button class="btn" onclick="openProductForm()">+ Add Product</button>
       </div>
       <table id="products-table">
-        <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price (GBP base)</th><th>Stock</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price (ZAR)</th><th>Stock</th><th>Actions</th></tr></thead>
         <tbody></tbody>
       </table>
     </section>
@@ -119,8 +119,8 @@
     </div>
     <div class="form-grid-2">
       <div class="form-row">
-        <label>Price (GBP base, VAT/markup auto-applied)</label>
-        <input type="number" step="0.01" id="p-price" placeholder="e.g. 95">
+        <label>Price (ZAR, incl. VAT — what customers see)</label>
+        <input type="number" step="0.01" id="p-price" placeholder="e.g. 2622.00">
       </div>
       <div class="form-row">
         <label>In Stock</label>
@@ -164,6 +164,17 @@
 <script>
   function fmtZAR(n) {
     return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n || 0);
+  }
+
+  // Products are stored as a GBP base price; the storefront applies this
+  // same markup+VAT (formatPrice in catalog.js) to show the final ZAR price.
+  const GBP_TO_ZAR_RATE = 24;
+  const VAT_RATE = 0.15;
+  function gbpBaseToZar(basePrice) {
+    return basePrice * GBP_TO_ZAR_RATE * (1 + VAT_RATE);
+  }
+  function zarToGbpBase(zarPrice) {
+    return zarPrice / (GBP_TO_ZAR_RATE * (1 + VAT_RATE));
   }
 
   function login() {
@@ -211,7 +222,7 @@
           <td>${thumb ? `<img class="prod-thumb" src="${thumb}">` : '—'}</td>
           <td>${p.name}</td>
           <td>${p.category || ''}</td>
-          <td>£${Number(p.price).toFixed(2)}</td>
+          <td>${fmtZAR(gbpBaseToZar(Number(p.price)))}</td>
           <td>${p.stock ? 'Yes' : 'No'}</td>
           <td>
             <button class="btn-outline-sm" onclick="openProductForm(${p.id})">Edit</button>
@@ -266,7 +277,7 @@
     document.getElementById('p-name').value = p ? p.name : '';
     document.getElementById('p-category').value = p ? p.category || '' : '';
     document.getElementById('p-code').value = p ? p.code || '' : '';
-    document.getElementById('p-price').value = p ? p.price : '';
+    document.getElementById('p-price').value = p ? gbpBaseToZar(Number(p.price)).toFixed(2) : '';
     document.getElementById('p-stock').value = p ? String(!!p.stock) : 'true';
     document.getElementById('p-color').value = p ? p.color || '' : '';
     document.getElementById('p-size').value = p ? p.size || '' : '';
@@ -287,7 +298,7 @@
       name: document.getElementById('p-name').value.trim(),
       category: document.getElementById('p-category').value.trim(),
       code: document.getElementById('p-code').value.trim(),
-      price: Number(document.getElementById('p-price').value) || 0,
+      price: zarToGbpBase(Number(document.getElementById('p-price').value) || 0),
       stock: document.getElementById('p-stock').value === 'true',
       color: document.getElementById('p-color').value.trim(),
       size: document.getElementById('p-size').value.trim(),
