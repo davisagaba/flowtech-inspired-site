@@ -167,7 +167,7 @@
 <script src="script.js"></script>
 <script>
   const params = new URLSearchParams(window.location.search);
-  const product = getProductById(params.get('id'));
+  const product = getProductByParam(params);
 
   if (!product) {
     document.querySelector('.detail-layout').innerHTML = '<p>Product not found. <a href="products.html">Back to Products</a></p>';
@@ -188,7 +188,13 @@
     document.getElementById('detail-desc').textContent = descText;
 
     // --- SEO: meta description, canonical, Open Graph, JSON-LD Product + Breadcrumb schema ---
-    const pageUrlAbs = 'https://lyfestyleceramics.co.za/product-detail.html?id=' + product.id;
+    const pageUrlAbs = 'https://lyfestyleceramics.co.za/' + productUrl(product);
+
+    // If reached via a legacy ?id= link, quietly upgrade the address bar to the
+    // slug URL (no reload) so the visible/shared link is always the clean one.
+    if (!params.get('slug')) {
+      window.history.replaceState(null, '', productUrl(product));
+    }
     const metaDesc = `${name} (${product.code}) — ${descText} ${formatPrice(product.price)}. ${product.stock ? 'In stock' : 'Out of stock'}, shipped across South Africa by Life Style Ceramics.`.slice(0, 300);
     document.getElementById('meta-description').setAttribute('content', metaDesc);
     document.getElementById('canonical-link').setAttribute('href', pageUrlAbs);
@@ -285,7 +291,7 @@
       syncFavLabel();
     });
 
-    document.getElementById('quote-link').href = 'quote.html?id=' + product.id;
+    document.getElementById('quote-link').href = 'quote.html?slug=' + product.slug;
 
     if (product.specs) {
       document.getElementById('specs-wrap').hidden = false;

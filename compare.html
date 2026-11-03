@@ -132,7 +132,7 @@
 
     const rows = [
       { label: 'Image', render: (p) => `<img src="${getProductImages(p, 200)[0]}" alt="${p.name}" class="compare-img">` },
-      { label: 'Name', render: (p) => `<a href="product-detail.html?id=${p.id}">${p.name}</a>` },
+      { label: 'Name', render: (p) => `<a href="product-detail.html?slug=${p.slug}">${p.name}</a>` },
       { label: 'Product Code', render: (p) => p.code },
       { label: 'Category', render: (p) => p.category },
       { label: 'Price', render: (p) => formatPrice(p.price) },

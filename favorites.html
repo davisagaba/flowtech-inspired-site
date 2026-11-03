@@ -140,9 +140,9 @@
             ${!p.stock ? '<span class="stock-badge">Out of Stock</span>' : ""}
           </div>
           <p class="product-code">${p.code}</p>
-          <h3><a href="product-detail.html?id=${p.id}">${p.name}</a></h3>
+          <h3><a href="product-detail.html?slug=${p.slug}">${p.name}</a></h3>
           <p class="product-price">${formatPrice(p.price)}</p>
-          <a href="product-detail.html?id=${p.id}" class="btn-outline small">View Item</a>
+          <a href="product-detail.html?slug=${p.slug}" class="btn-outline small">View Item</a>
         </article>`;
       })
       .join('');

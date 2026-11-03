@@ -178,18 +178,18 @@ function renderGrid() {
         <div class="product-image">
           <img src="${img}" alt="${p.name}" loading="lazy">
           <button type="button" class="favorite-btn${fav ? " favorite-active" : ""}" data-id="${p.id}" aria-pressed="${fav}" aria-label="Add to favorites">♥</button>
-          <a href="product-detail.html?id=${p.id}" class="quickview-btn" aria-label="Quick view">👁</a>
+          <a href="product-detail.html?slug=${p.slug}" class="quickview-btn" aria-label="Quick view">👁</a>
           ${!p.stock ? '<span class="stock-badge">Out of Stock</span>' : ""}
         </div>
         <p class="product-code">${p.code}</p>
-        <h3><a href="product-detail.html?id=${p.id}">${p.name}</a></h3>
+        <h3><a href="product-detail.html?slug=${p.slug}">${p.name}</a></h3>
         <p class="product-price">${formatPriceWithStrike(p.price)}</p>
         <label class="compare-option">
           <input type="checkbox" class="compare-checkbox" data-id="${p.id}" ${compared ? "checked" : ""}>
           Compare
         </label>
         <div class="card-actions-row">
-          <a href="product-detail.html?id=${p.id}" class="btn-outline small">View Item</a>
+          <a href="product-detail.html?slug=${p.slug}" class="btn-outline small">View Item</a>
           ${p.stock ? `<button type="button" class="btn-cta small add-to-cart-btn" data-id="${p.id}">Add to Basket</button>` : ""}
         </div>
       </article>`;

@@ -148,8 +148,39 @@ function getProductImages(product, w) {
   return product.images.map((id) => pexelsUrl(id, product.ext, w));
 }
 
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+// Assign a URL slug to every product, derived from its name.
+CATALOG.forEach((p) => { p.slug = slugify(p.name); });
+
 function getProductById(id) {
   return CATALOG.find((p) => p.id === Number(id));
+}
+
+function getProductBySlug(slug) {
+  return CATALOG.find((p) => p.slug === slug);
+}
+
+// Resolves a product from either a slug or a legacy numeric id — used by
+// product-detail.html so old ?id= links keep working after the URL change.
+function getProductByParam(params) {
+  const slug = params.get("slug");
+  if (slug) {
+    const bySlug = getProductBySlug(slug);
+    if (bySlug) return bySlug;
+  }
+  const id = params.get("id");
+  if (id) return getProductById(id);
+  return undefined;
+}
+
+function productUrl(product) {
+  return "product-detail.html?slug=" + product.slug;
 }
 
 function getCategorySlug(category) {

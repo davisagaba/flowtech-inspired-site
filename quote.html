@@ -186,11 +186,10 @@
 <script src="script.js"></script>
 <script>
   const params = new URLSearchParams(window.location.search);
-  const presetId = params.get('id');
 
   let quoteItems = getCartItemsWithProducts();
-  if (quoteItems.length === 0 && presetId) {
-    const product = getProductById(presetId);
+  if (quoteItems.length === 0) {
+    const product = getProductByParam(params);
     if (product) quoteItems = [{ id: product.id, qty: 1, product }];
   }
 

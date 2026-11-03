@@ -215,7 +215,7 @@ function clearRecentSearches() {
 
 function productDetailUrl(product) {
   const img = getProductImages(product, 500)[0];
-  return `product-detail.html?id=${product.id}`;
+  return productUrl(product);
 }
 
 function initSearchUI() {
