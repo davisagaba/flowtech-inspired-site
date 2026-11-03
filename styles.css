@@ -734,6 +734,11 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
 }
 #quote-items-table th { font-weight: 600; }
 .quote-items-total { margin-top: 12px; font-weight: 700; text-align: right; }
+.qty-stepper { display: inline-flex; align-items: center; gap: 0; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+.qty-stepper .qty-btn { background: #f3f4f2; border: none; width: 28px; height: 28px; font-size: 15px; cursor: pointer; color: var(--dark); line-height: 1; }
+.qty-stepper .qty-btn:hover { background: #e6e7e4; }
+.qty-stepper .qty-input { width: 40px; border: none; text-align: center; font-family: inherit; font-size: 13px; -moz-appearance: textfield; }
+.qty-stepper .qty-input::-webkit-outer-spin-button, .qty-stepper .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

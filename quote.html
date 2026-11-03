@@ -198,20 +198,48 @@
   const itemsWrap = document.getElementById('quote-items-wrap');
   const fallbackWrap = document.getElementById('qproduct-fallback-wrap');
 
-  if (quoteItems.length > 0) {
-    fallbackWrap.hidden = true;
+  function renderQuoteItems() {
     document.getElementById('quote-items-table').innerHTML = quoteItems
-      .map(({ qty, product }) => `
+      .map(({ qty, product }, i) => `
         <tr>
           <th>${product.name} <span class="product-code">(${product.code})</span></th>
-          <td>Qty ${qty} &times; ${formatPrice(product.price)} = <strong>${formatPrice(product.price * qty)}</strong></td>
+          <td>
+            <div class="qty-stepper">
+              <button type="button" class="qty-btn" data-i="${i}" data-dir="-1" aria-label="Decrease quantity">&minus;</button>
+              <input type="number" class="qty-input" data-i="${i}" min="1" value="${qty}" inputmode="numeric">
+              <button type="button" class="qty-btn" data-i="${i}" data-dir="1" aria-label="Increase quantity">+</button>
+            </div>
+            &times; ${formatPrice(product.price)} = <strong>${formatPrice(product.price * qty)}</strong>
+          </td>
         </tr>`)
       .join('');
+
     const subtotal = quoteItems.reduce((sum, { qty, product }) => sum + product.price * qty, 0);
     const baseZar = subtotal * GBP_TO_ZAR_RATE;
     const totalZar = baseZar * (1 + VAT_RATE);
     document.getElementById('quote-items-total').textContent =
       'Total (incl. 15% VAT): ' + zarFormatter.format(totalZar);
+
+    document.querySelectorAll('.qty-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.i);
+        const dir = Number(btn.dataset.dir);
+        quoteItems[i].qty = Math.max(1, quoteItems[i].qty + dir);
+        renderQuoteItems();
+      });
+    });
+    document.querySelectorAll('.qty-input').forEach((input) => {
+      input.addEventListener('change', () => {
+        const i = Number(input.dataset.i);
+        quoteItems[i].qty = Math.max(1, Number(input.value) || 1);
+        renderQuoteItems();
+      });
+    });
+  }
+
+  if (quoteItems.length > 0) {
+    fallbackWrap.hidden = true;
+    renderQuoteItems();
   } else {
     itemsWrap.hidden = true;
     fallbackWrap.hidden = false;
