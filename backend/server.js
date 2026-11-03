@@ -17,6 +17,10 @@ const PUBLIC_DIR = '/opt/lifestyle-ceramics/public';
 const PRODUCTS_JSON = '/opt/lifestyle-ceramics/backend/products.json';
 const UPLOADS_DIR = path.join(PUBLIC_DIR, 'uploads', 'products');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// Mail attachments are staged privately (not under the public web root) and
+// deleted once the email that references them has been sent.
+const MAIL_ATTACHMENTS_DIR = '/opt/lifestyle-ceramics/backend/mail-attachments';
+if (!fs.existsSync(MAIL_ATTACHMENTS_DIR)) fs.mkdirSync(MAIL_ATTACHMENTS_DIR, { recursive: true });
 
 const mailer = nodemailer.createTransport({
   host: process.env.LSC_SMTP_HOST || 'smtpout.secureserver.net',
@@ -493,6 +497,22 @@ app.post('/admin/upload-image', requireAdmin, upload.single('image'), (req, res)
   res.json({ ok: true, url: `/uploads/products/${req.file.filename}` });
 });
 
+const uploadAttachment = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, MAIL_ATTACHMENTS_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname) || '';
+      cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
+
+app.post('/admin/mailbox/upload-attachment', requireAdmin, uploadAttachment.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded.' });
+  res.json({ ok: true, id: req.file.filename, filename: req.file.originalname, size: req.file.size });
+});
+
 // --- Live mailbox (unibox: real Inbox/Outbox from the actual mailbox) ---
 let sentFolderNameCache = null;
 async function findSentFolder() {
@@ -538,10 +558,16 @@ app.get('/admin/mailbox/outbox', requireAdmin, async (req, res) => {
 // (GoDaddy's SMTP relay does not auto-save sent mail like Gmail/M365 do).
 app.post('/admin/mailbox/send', requireAdmin, async (req, res) => {
   try {
-    const { to, subject, body, inReplyTo, references } = req.body || {};
+    const { to, subject, body, inReplyTo, references, attachmentIds } = req.body || {};
     if (!to || !subject || !body) {
       return res.status(400).json({ ok: false, error: 'Missing to, subject or body.' });
     }
+
+    const attachmentFiles = Array.isArray(attachmentIds)
+      ? attachmentIds
+        .map((id) => path.join(MAIL_ATTACHMENTS_DIR, path.basename(String(id))))
+        .filter((p) => fs.existsSync(p))
+      : [];
 
     const mailOptions = {
       from: `"Life Style Ceramics" <${process.env.LSC_SMTP_USER}>`,
@@ -549,6 +575,7 @@ app.post('/admin/mailbox/send', requireAdmin, async (req, res) => {
       subject,
       text: body,
       ...(inReplyTo ? { inReplyTo, references: references || inReplyTo } : {}),
+      ...(attachmentFiles.length ? { attachments: attachmentFiles.map((p) => ({ path: p })) } : {}),
     };
 
     await mailer.sendMail(mailOptions);
@@ -569,6 +596,8 @@ app.post('/admin/mailbox/send', requireAdmin, async (req, res) => {
       // Outbox until the mail server's own copy (if any) syncs.
       console.warn('Sent-folder append failed:', appendErr.message);
     }
+
+    attachmentFiles.forEach((p) => fs.unlink(p, () => {}));
 
     res.json({ ok: true });
   } catch (err) {

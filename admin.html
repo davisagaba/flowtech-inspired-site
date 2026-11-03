@@ -68,6 +68,15 @@
   .unread-badge { display: inline-block; background: #c0392b; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
   .unread-badge:empty { display: none; }
   .reply-btn { margin-top: 16px; }
+  .inline-reply { margin-top: 16px; border: 1px solid #e2e4e1; border-radius: 12px; padding: 14px; background: #fafaf9; }
+  .reply-toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+  .reply-toolbar button { background: #fff; border: 1px solid #e2e4e1; border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .reply-toolbar button:hover { background: #eee; }
+  .inline-reply textarea { width: 100%; min-height: 120px; padding: 10px; border: 1px solid #e2e4e1; border-radius: 10px; font-family: inherit; font-size: 13px; resize: vertical; }
+  .attach-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .attach-chip { display: inline-flex; align-items: center; gap: 6px; background: #eaf3f2; color: #0d5559; font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+  .attach-chip button { background: none; border: none; color: #0d5559; cursor: pointer; font-weight: 700; font-size: 13px; padding: 0; }
+  .inline-reply-actions { display: flex; gap: 10px; margin-top: 10px; }
 
   .panel-tabs { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; border-bottom: 1px solid #e2e4e1; padding-bottom: 0; }
   .panel-tab { background: none; border: none; padding: 10px 18px; font-size: 14px; font-weight: 600; color: #6b7074; cursor: pointer; font-family: inherit; border-bottom: 3px solid transparent; margin-bottom: -1px; }
@@ -578,7 +587,7 @@
         ${fmtMailDate(m.date)}
       </div>
       <div class="mail-body">${(m.body || '').replace(/</g, '&lt;') || '(no content)'}</div>
-      ${currentMailFolder === 'inbox' ? `<button class="btn reply-btn" onclick="openReply(${i})">Reply</button>` : ''}
+      ${currentMailFolder === 'inbox' ? `<button class="btn reply-btn" id="reply-toggle-btn" onclick="showInlineReply(${i})">Reply</button><div id="inline-reply-box"></div>` : ''}
     `;
 
     if (currentMailFolder === 'inbox' && !m.seen) {
@@ -595,24 +604,125 @@
     }
   }
 
-  // ---------- Compose / Reply ----------
+  // ---------- Inline Reply (stays in the Inbox tab, no modal) ----------
+  let replyAttachments = [];
+
+  function showInlineReply(i) {
+    const m = currentMailMessages[i];
+    replyAttachments = [];
+    document.getElementById('reply-toggle-btn').style.display = 'none';
+    const box = document.getElementById('inline-reply-box');
+    box.innerHTML = `
+      <div class="inline-reply">
+        <div class="reply-toolbar">
+          <button type="button" title="Insert bullet list" onclick="insertBulletList()">• List</button>
+          <button type="button" title="Attach a file" onclick="document.getElementById('reply-attach-input').click()">📎 Attach</button>
+          <input type="file" id="reply-attach-input" style="display:none" onchange="uploadReplyAttachment(this)">
+        </div>
+        <textarea id="reply-body" placeholder="Write your reply…">\n\n---\nOn ${fmtMailDate(m.date)}, ${m.from} wrote:\n${(m.body || '').split('\n').map((l) => '> ' + l).join('\n')}</textarea>
+        <div class="attach-chips" id="reply-attach-chips"></div>
+        <p class="muted" id="reply-status"></p>
+        <div class="inline-reply-actions">
+          <button class="btn-cancel" onclick="cancelInlineReply()">Cancel</button>
+          <button class="btn" onclick="sendInlineReply(${i})">Send Reply</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('reply-body').focus();
+  }
+
+  function cancelInlineReply() {
+    replyAttachments = [];
+    document.getElementById('inline-reply-box').innerHTML = '';
+    document.getElementById('reply-toggle-btn').style.display = '';
+  }
+
+  function insertBulletList() {
+    const ta = document.getElementById('reply-body');
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const before = ta.value.slice(0, start);
+    const selected = ta.value.slice(start, end) || 'List item';
+    const after = ta.value.slice(end);
+    const bulleted = selected.split('\n').map((l) => '• ' + l).join('\n');
+    ta.value = before + bulleted + after;
+    ta.focus();
+    ta.selectionStart = start;
+    ta.selectionEnd = start + bulleted.length;
+  }
+
+  function uploadReplyAttachment(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const status = document.getElementById('reply-status');
+    status.textContent = 'Uploading ' + file.name + '…';
+    const formData = new FormData();
+    formData.append('file', file);
+    fetch('/api/admin/mailbox/upload-attachment?password=' + encodeURIComponent(adminPw()), {
+      method: 'POST',
+      body: formData,
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Upload failed');
+        replyAttachments.push({ id: data.id, filename: data.filename });
+        renderReplyAttachChips();
+        status.textContent = '';
+        input.value = '';
+      })
+      .catch((err) => {
+        status.textContent = 'Error: ' + err.message;
+      });
+  }
+
+  function renderReplyAttachChips() {
+    document.getElementById('reply-attach-chips').innerHTML = replyAttachments.map((a, idx) => `
+      <span class="attach-chip">${a.filename}<button onclick="removeReplyAttachment(${idx})">×</button></span>
+    `).join('');
+  }
+
+  function removeReplyAttachment(idx) {
+    replyAttachments.splice(idx, 1);
+    renderReplyAttachChips();
+  }
+
+  function sendInlineReply(i) {
+    const m = currentMailMessages[i];
+    const body = document.getElementById('reply-body').value;
+    const status = document.getElementById('reply-status');
+    if (!body.trim()) {
+      status.textContent = 'Message cannot be empty.';
+      return;
+    }
+    status.textContent = 'Sending…';
+    fetch('/api/admin/mailbox/send?password=' + encodeURIComponent(adminPw()), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: m.fromAddress,
+        subject: /^re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject,
+        body,
+        inReplyTo: m.messageId || undefined,
+        attachmentIds: replyAttachments.map((a) => a.id),
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Send failed');
+        cancelInlineReply();
+        status.textContent = '';
+      })
+      .catch((err) => {
+        status.textContent = 'Error: ' + err.message;
+      });
+  }
+
+  // ---------- Compose (new email, modal) ----------
   function openCompose() {
     document.getElementById('compose-modal-title').textContent = 'Compose Email';
     document.getElementById('c-in-reply-to').value = '';
     document.getElementById('c-to').value = '';
     document.getElementById('c-subject').value = '';
     document.getElementById('c-body').value = '';
-    document.getElementById('compose-status').textContent = '';
-    document.getElementById('compose-modal').classList.add('open');
-  }
-
-  function openReply(i) {
-    const m = currentMailMessages[i];
-    document.getElementById('compose-modal-title').textContent = 'Reply';
-    document.getElementById('c-in-reply-to').value = m.messageId || '';
-    document.getElementById('c-to').value = m.fromAddress || '';
-    document.getElementById('c-subject').value = /^re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject;
-    document.getElementById('c-body').value = `\n\n---\nOn ${fmtMailDate(m.date)}, ${m.from} wrote:\n${(m.body || '').split('\n').map((l) => '> ' + l).join('\n')}`;
     document.getElementById('compose-status').textContent = '';
     document.getElementById('compose-modal').classList.add('open');
   }
