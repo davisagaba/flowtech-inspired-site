@@ -534,7 +534,7 @@
   function loadMail(folder) {
     const list = document.getElementById('mail-list');
     list.innerHTML = '<div class="mail-empty">Loading…</div>';
-    fetch('/api/admin/mailbox/' + folder + '?password=' + encodeURIComponent(adminPw()) + '&limit=30')
+    fetch('/api/admin/mailbox/' + folder + '?password=' + encodeURIComponent(adminPw()) + '&limit=30', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Failed to load mailbox');
@@ -710,10 +710,25 @@
         if (!data.ok) throw new Error(data.error || 'Send failed');
         cancelInlineReply();
         status.textContent = '';
+        showMailToast('Reply sent — check the Outbox tab to see it.');
       })
       .catch((err) => {
         status.textContent = 'Error: ' + err.message;
       });
+  }
+
+  function showMailToast(message) {
+    let toast = document.getElementById('mail-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'mail-toast';
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0d5559;color:#fff;padding:12px 20px;border-radius:999px;font-size:13px;font-weight:600;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.2);';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.display = 'block';
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => { toast.style.display = 'none'; }, 3500);
   }
 
   // ---------- Compose (new email, modal) ----------
@@ -751,6 +766,7 @@
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Send failed');
         closeCompose();
+        showMailToast('Email sent — check the Outbox tab to see it.');
         if (currentMailFolder === 'outbox') loadMail('outbox');
       })
       .catch((err) => {
