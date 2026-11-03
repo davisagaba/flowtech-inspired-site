@@ -46,6 +46,25 @@
   .image-item button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #c0392b; color: #fff; border: none; font-size: 11px; line-height: 1; cursor: pointer; }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
   .btn-cancel { background: #f0f0ee; color: #333; border: none; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: inherit; }
+
+  .mail-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+  .mail-tab { background: #fff; border: 1px solid #e2e4e1; color: #444; padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .mail-tab.active { background: #0d5559; color: #fff; border-color: #0d5559; }
+  .unibox { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 0; background: #fff; border-radius: 14px; overflow: hidden; min-height: 420px; }
+  .mail-list { border-right: 1px solid #eee; max-height: 560px; overflow-y: auto; }
+  .mail-row { padding: 12px 16px; border-bottom: 1px solid #f1f1ef; cursor: pointer; }
+  .mail-row:hover { background: #f8f8f7; }
+  .mail-row.active { background: #eaf3f2; }
+  .mail-row.unread .mail-from { font-weight: 800; }
+  .mail-from { font-size: 13px; }
+  .mail-subject { font-size: 13px; color: #333; margin: 2px 0; }
+  .mail-snippet { font-size: 12px; color: #8a8e90; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mail-date { font-size: 11px; color: #aaa; }
+  .mail-reading-pane { padding: 20px; max-height: 560px; overflow-y: auto; }
+  .mail-reading-pane h3 { margin: 0 0 6px; font-size: 16px; }
+  .mail-meta { font-size: 12px; color: #6b7074; margin-bottom: 14px; }
+  .mail-body { font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
+  .mail-empty { padding: 40px 20px; text-align: center; color: #aaa; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -66,10 +85,20 @@
     <section>
       <div class="section-head">
         <h2 style="font-size:16px;margin:0;">Email — sales@lyfestyleceramics.co.za</h2>
-        <a class="btn" style="text-decoration:none;" href="https://email.godaddy.com" target="_blank" rel="noopener" id="webmail-fallback-link">Open in New Tab ↗</a>
+        <button class="btn" style="padding:8px 16px;font-size:12px;" onclick="loadMail(currentMailFolder)">Refresh</button>
       </div>
-      <p class="muted" style="margin-top:0;" id="webmail-note">Loading webmail inside the panel…</p>
-      <iframe id="webmail-frame" src="https://email.godaddy.com" style="width:100%;height:640px;border:1px solid #e2e4e1;border-radius:14px;background:#fff;" title="Webmail"></iframe>
+      <div class="mail-tabs">
+        <button class="mail-tab active" id="tab-inbox" onclick="switchMailTab('inbox')">Inbox</button>
+        <button class="mail-tab" id="tab-outbox" onclick="switchMailTab('outbox')">Outbox</button>
+      </div>
+      <div class="unibox">
+        <div class="mail-list" id="mail-list">
+          <div class="mail-empty">Loading…</div>
+        </div>
+        <div class="mail-reading-pane" id="mail-reading-pane">
+          <div class="mail-empty">Select a message to read it</div>
+        </div>
+      </div>
     </section>
 
     <section>
@@ -196,6 +225,7 @@
         document.getElementById('app').style.display = 'block';
         render(data);
         loadProducts();
+        loadMail(currentMailFolder);
       })
       .catch(() => {
         document.getElementById('login-error').textContent = 'Incorrect password.';
@@ -403,34 +433,63 @@
       });
   }
 
-  // Webmail providers commonly block iframing (X-Frame-Options/CSP) to stop
-  // clickjacking, so detect a blocked/blank frame and fall back to a clear
-  // "open in new tab" message instead of leaving a dead empty box.
-  (function initWebmailFrame() {
-    const frame = document.getElementById('webmail-frame');
-    const note = document.getElementById('webmail-note');
-    let settled = false;
+  // ---------- Unibox: real Inbox/Outbox pulled live via IMAP ----------
+  let currentMailFolder = 'inbox';
+  let currentMailMessages = [];
 
-    function markBlocked() {
-      if (settled) return;
-      settled = true;
-      frame.style.display = 'none';
-      note.innerHTML = 'Your browser blocked this from loading inside the panel (GoDaddy does not allow its webmail to be embedded). Use "Open in New Tab" above instead.';
-    }
+  function switchMailTab(folder) {
+    currentMailFolder = folder;
+    document.getElementById('tab-inbox').classList.toggle('active', folder === 'inbox');
+    document.getElementById('tab-outbox').classList.toggle('active', folder === 'outbox');
+    document.getElementById('mail-reading-pane').innerHTML = '<div class="mail-empty">Select a message to read it</div>';
+    loadMail(folder);
+  }
 
-    function markLoaded() {
-      if (settled) return;
-      settled = true;
-      note.textContent = '';
-    }
+  function fmtMailDate(iso) {
+    const d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleString('en-ZA', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
 
-    // Cross-origin frames can't be inspected by JS either way, and a blocked
-    // frame still fires 'load' in most browsers — so 'load' only clears the
-    // loading message optimistically; the timeout is the real fallback check.
-    frame.addEventListener('load', markLoaded);
-    frame.addEventListener('error', markBlocked);
-    setTimeout(() => { if (!settled) note.textContent = 'If nothing appears above, GoDaddy is blocking the embed — use "Open in New Tab".'; }, 4000);
-  })();
+  function loadMail(folder) {
+    const list = document.getElementById('mail-list');
+    list.innerHTML = '<div class="mail-empty">Loading…</div>';
+    fetch('/api/admin/mailbox/' + folder + '?password=' + encodeURIComponent(adminPw()) + '&limit=30')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed to load mailbox');
+        currentMailMessages = data.messages || [];
+        if (currentMailMessages.length === 0) {
+          list.innerHTML = '<div class="mail-empty">No messages</div>';
+          return;
+        }
+        list.innerHTML = currentMailMessages.map((m, i) => `
+          <div class="mail-row ${m.seen ? '' : 'unread'}" data-i="${i}" onclick="openMailMessage(${i})">
+            <div class="mail-from">${(folder === 'inbox' ? m.from : m.to) || '(unknown)'}</div>
+            <div class="mail-subject">${m.subject}</div>
+            <div class="mail-snippet">${m.snippet || ''}</div>
+            <div class="mail-date">${fmtMailDate(m.date)}</div>
+          </div>
+        `).join('');
+      })
+      .catch((err) => {
+        list.innerHTML = '<div class="mail-empty">Could not load mail: ' + err.message + '</div>';
+      });
+  }
+
+  function openMailMessage(i) {
+    document.querySelectorAll('.mail-row').forEach((row) => row.classList.remove('active'));
+    document.querySelector(`.mail-row[data-i="${i}"]`)?.classList.add('active');
+    const m = currentMailMessages[i];
+    document.getElementById('mail-reading-pane').innerHTML = `
+      <h3>${m.subject}</h3>
+      <div class="mail-meta">
+        From: ${m.from || '—'}<br>
+        To: ${m.to || '—'}<br>
+        ${fmtMailDate(m.date)}
+      </div>
+      <div class="mail-body">${(m.body || '').replace(/</g, '&lt;') || '(no content)'}</div>
+    `;
+  }
 
   // Auto-login if password already stored in this session
   const stored = sessionStorage.getItem('lsc_admin_pw');

@@ -2,6 +2,8 @@ const express = require('express');
 const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
+const { ImapFlow } = require('imapflow');
+const { simpleParser } = require('mailparser');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -25,6 +27,62 @@ const mailer = nodemailer.createTransport({
     pass: process.env.LSC_SMTP_PASS,
   },
 });
+
+function imapClient() {
+  return new ImapFlow({
+    host: process.env.LSC_IMAP_HOST || 'imap.secureserver.net',
+    port: Number(process.env.LSC_IMAP_PORT) || 993,
+    secure: true,
+    auth: {
+      user: process.env.LSC_SMTP_USER,
+      pass: process.env.LSC_SMTP_PASS,
+    },
+    logger: false,
+  });
+}
+
+// Fetches the most recent messages from a mailbox folder, newest first.
+async function fetchMailbox(folder, limit) {
+  const client = imapClient();
+  const messages = [];
+  await client.connect();
+  try {
+    const lock = await client.getMailboxLock(folder);
+    try {
+      const mailbox = client.mailbox;
+      const total = mailbox.exists;
+      if (total > 0) {
+        const start = Math.max(1, total - limit + 1);
+        for await (const msg of client.fetch(`${start}:${total}`, { envelope: true, flags: true, source: true })) {
+          let snippet = '';
+          let body = '';
+          try {
+            const parsed = await simpleParser(msg.source);
+            body = (parsed.text || '').trim().slice(0, 5000);
+            snippet = body.replace(/\s+/g, ' ').slice(0, 200);
+          } catch {
+            /* ignore parse failure, snippet/body stay empty */
+          }
+          messages.push({
+            uid: msg.uid,
+            from: msg.envelope.from && msg.envelope.from[0] ? `${msg.envelope.from[0].name || ''} <${msg.envelope.from[0].address}>`.trim() : '',
+            to: msg.envelope.to && msg.envelope.to[0] ? msg.envelope.to[0].address : '',
+            subject: msg.envelope.subject || '(no subject)',
+            date: msg.envelope.date,
+            seen: msg.flags.has('\\Seen'),
+            snippet,
+            body,
+          });
+        }
+      }
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+  return messages.reverse();
+}
 
 function requireAdmin(req, res, next) {
   const pw = req.query.password || req.headers['x-admin-password'];
@@ -431,6 +489,46 @@ const upload = multer({
 app.post('/admin/upload-image', requireAdmin, upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded.' });
   res.json({ ok: true, url: `/uploads/products/${req.file.filename}` });
+});
+
+// --- Live mailbox (unibox: real Inbox/Outbox from the actual mailbox) ---
+let sentFolderNameCache = null;
+async function findSentFolder() {
+  if (sentFolderNameCache) return sentFolderNameCache;
+  const client = imapClient();
+  await client.connect();
+  try {
+    const list = await client.list();
+    const sent = list.find((f) => f.specialUse === '\\Sent')
+      || list.find((f) => /^sent/i.test(f.name) || /sent items/i.test(f.name));
+    sentFolderNameCache = sent ? sent.path : 'Sent Messages';
+    return sentFolderNameCache;
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
+app.get('/admin/mailbox/inbox', requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 25, 100);
+    const messages = await fetchMailbox('INBOX', limit);
+    res.json({ ok: true, messages });
+  } catch (err) {
+    console.error('Inbox fetch error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/admin/mailbox/outbox', requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 25, 100);
+    const folder = await findSentFolder();
+    const messages = await fetchMailbox(folder, limit);
+    res.json({ ok: true, messages, folder });
+  } catch (err) {
+    console.error('Outbox fetch error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.get('/health', (req, res) => res.json({ ok: true }));
