@@ -26,6 +26,26 @@
   .pill.done { background: #d6f0e0; color: #0d5559; }
   section { margin-bottom: 32px; }
   #app { display: none; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .prod-thumb { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; background: #eee; }
+  .btn-sm { padding: 6px 14px; font-size: 12px; }
+  .btn-outline-sm { background: #fff; color: #0d5559; border: 1px solid #0d5559; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn-danger-sm { background: #fff; color: #c0392b; border: 1px solid #c0392b; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 24px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { margin-top: 0; }
+  .form-row { margin-bottom: 12px; }
+  .form-row label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #444; }
+  .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 9px 11px; border: 1px solid #e2e4e1; border-radius: 10px; font-family: inherit; font-size: 13px; }
+  .form-row textarea { min-height: 70px; resize: vertical; }
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .image-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .image-item { position: relative; width: 64px; height: 64px; }
+  .image-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+  .image-item button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #c0392b; color: #fff; border: none; font-size: 11px; line-height: 1; cursor: pointer; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .btn-cancel { background: #f0f0ee; color: #333; border: none; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: inherit; }
 </style>
 </head>
 <body>
@@ -49,6 +69,17 @@
     </section>
 
     <section>
+      <div class="section-head">
+        <h2 style="font-size:16px;margin:0;">Products</h2>
+        <button class="btn" onclick="openProductForm()">+ Add Product</button>
+      </div>
+      <table id="products-table">
+        <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price (GBP base)</th><th>Stock</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section>
       <h2 style="font-size:16px;">Top Pages (all time)</h2>
       <table id="top-pages-table"><thead><tr><th>Page</th><th>Views</th></tr></thead><tbody></tbody></table>
     </section>
@@ -56,7 +87,7 @@
     <section>
       <h2 style="font-size:16px;">Quote Requests</h2>
       <table id="quotes-table">
-        <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+        <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
         <tbody></tbody>
       </table>
     </section>
@@ -65,6 +96,68 @@
       <h2 style="font-size:16px;">Recent Page Views</h2>
       <table id="recent-views-table"><thead><tr><th>Time</th><th>Page</th><th>Referrer</th><th>IP</th></tr></thead><tbody></tbody></table>
     </section>
+  </div>
+</div>
+
+<div class="modal-overlay" id="product-modal">
+  <div class="modal">
+    <h3 id="product-modal-title">Add Product</h3>
+    <input type="hidden" id="p-id">
+    <div class="form-row">
+      <label>Name</label>
+      <input type="text" id="p-name" placeholder="e.g. Jet Hand Dryer">
+    </div>
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label>Category</label>
+        <input type="text" id="p-category" placeholder="e.g. Hand Dryers">
+      </div>
+      <div class="form-row">
+        <label>Product Code</label>
+        <input type="text" id="p-code" placeholder="e.g. FLW-101-001">
+      </div>
+    </div>
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label>Price (GBP base, VAT/markup auto-applied)</label>
+        <input type="number" step="0.01" id="p-price" placeholder="e.g. 95">
+      </div>
+      <div class="form-row">
+        <label>In Stock</label>
+        <select id="p-stock">
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label>Color / Finish</label>
+        <input type="text" id="p-color" placeholder="e.g. Matt Black">
+      </div>
+      <div class="form-row">
+        <label>Size (optional)</label>
+        <input type="text" id="p-size" placeholder="e.g. 640 x 375 x 385mm">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Power Source (optional)</label>
+      <input type="text" id="p-power" placeholder="e.g. Mains Operated">
+    </div>
+    <div class="form-row">
+      <label>Description (optional)</label>
+      <textarea id="p-desc" placeholder="Full product description shown on the product page"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Images</label>
+      <input type="file" id="p-image-upload" accept="image/*" onchange="uploadProductImage(this)">
+      <p class="muted" id="upload-status" style="margin:4px 0 0;"></p>
+      <div class="image-list" id="p-image-list"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeProductForm()">Cancel</button>
+      <button class="btn" onclick="saveProduct()">Save Product</button>
+    </div>
   </div>
 </div>
 
@@ -82,10 +175,154 @@
         document.getElementById('login-box').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         render(data);
+        loadProducts();
       })
       .catch(() => {
         document.getElementById('login-error').textContent = 'Incorrect password.';
       });
+  }
+
+  // ---------- Product management ----------
+  let currentProducts = [];
+  let currentImages = [];
+
+  function adminPw() {
+    return sessionStorage.getItem('lsc_admin_pw');
+  }
+
+  function loadProducts() {
+    fetch('/api/admin/products?password=' + encodeURIComponent(adminPw()))
+      .then((r) => r.json())
+      .then((data) => {
+        currentProducts = data.products || [];
+        renderProducts();
+      });
+  }
+
+  function renderProducts() {
+    document.querySelector('#products-table tbody').innerHTML = currentProducts
+      .map((p) => {
+        const thumb = (p.images && p.images[0])
+          ? (String(p.images[0]).startsWith('http') || String(p.images[0]).startsWith('/uploads/')
+              ? p.images[0]
+              : `https://images.pexels.com/photos/${p.images[0]}/pexels-photo-${p.images[0]}.jpeg?auto=compress&cs=tinysrgb&w=80`)
+          : '';
+        return `<tr>
+          <td>${thumb ? `<img class="prod-thumb" src="${thumb}">` : '—'}</td>
+          <td>${p.name}</td>
+          <td>${p.category || ''}</td>
+          <td>£${Number(p.price).toFixed(2)}</td>
+          <td>${p.stock ? 'Yes' : 'No'}</td>
+          <td>
+            <button class="btn-outline-sm" onclick="openProductForm(${p.id})">Edit</button>
+            <button class="btn-danger-sm" onclick="deleteProduct(${p.id})">Delete</button>
+          </td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="6" class="muted">No products yet</td></tr>';
+  }
+
+  function renderImageList() {
+    document.getElementById('p-image-list').innerHTML = currentImages.map((img, i) => {
+      const src = String(img).startsWith('http') || String(img).startsWith('/uploads/')
+        ? img
+        : `https://images.pexels.com/photos/${img}/pexels-photo-${img}.jpeg?auto=compress&cs=tinysrgb&w=80`;
+      return `<div class="image-item"><img src="${src}"><button onclick="removeImage(${i})">×</button></div>`;
+    }).join('');
+  }
+
+  function removeImage(i) {
+    currentImages.splice(i, 1);
+    renderImageList();
+  }
+
+  function uploadProductImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const status = document.getElementById('upload-status');
+    status.textContent = 'Uploading...';
+    const formData = new FormData();
+    formData.append('image', file);
+    fetch('/api/admin/upload-image?password=' + encodeURIComponent(adminPw()), {
+      method: 'POST',
+      body: formData,
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Upload failed');
+        currentImages.push(data.url);
+        renderImageList();
+        status.textContent = 'Uploaded.';
+        input.value = '';
+      })
+      .catch((err) => {
+        status.textContent = 'Error: ' + err.message;
+      });
+  }
+
+  function openProductForm(id) {
+    const p = id ? currentProducts.find((x) => x.id === id) : null;
+    document.getElementById('product-modal-title').textContent = p ? 'Edit Product' : 'Add Product';
+    document.getElementById('p-id').value = p ? p.id : '';
+    document.getElementById('p-name').value = p ? p.name : '';
+    document.getElementById('p-category').value = p ? p.category || '' : '';
+    document.getElementById('p-code').value = p ? p.code || '' : '';
+    document.getElementById('p-price').value = p ? p.price : '';
+    document.getElementById('p-stock').value = p ? String(!!p.stock) : 'true';
+    document.getElementById('p-color').value = p ? p.color || '' : '';
+    document.getElementById('p-size').value = p ? p.size || '' : '';
+    document.getElementById('p-power').value = p ? p.power || '' : '';
+    document.getElementById('p-desc').value = p ? p.desc || '' : '';
+    currentImages = p && p.images ? [...p.images] : [];
+    renderImageList();
+    document.getElementById('product-modal').classList.add('open');
+  }
+
+  function closeProductForm() {
+    document.getElementById('product-modal').classList.remove('open');
+  }
+
+  function saveProduct() {
+    const id = document.getElementById('p-id').value;
+    const payload = {
+      name: document.getElementById('p-name').value.trim(),
+      category: document.getElementById('p-category').value.trim(),
+      code: document.getElementById('p-code').value.trim(),
+      price: Number(document.getElementById('p-price').value) || 0,
+      stock: document.getElementById('p-stock').value === 'true',
+      color: document.getElementById('p-color').value.trim(),
+      size: document.getElementById('p-size').value.trim(),
+      power: document.getElementById('p-power').value.trim(),
+      desc: document.getElementById('p-desc').value.trim(),
+      images: currentImages,
+    };
+    if (!payload.name) { alert('Product name is required.'); return; }
+
+    const url = id
+      ? '/api/admin/products/' + id + '?password=' + encodeURIComponent(adminPw())
+      : '/api/admin/products?password=' + encodeURIComponent(adminPw());
+    fetch(url, {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Save failed');
+        closeProductForm();
+        loadProducts();
+      })
+      .catch((err) => alert('Could not save: ' + err.message));
+  }
+
+  function deleteProduct(id) {
+    if (!confirm('Delete this product? This cannot be undone.')) return;
+    fetch('/api/admin/products/' + id + '?password=' + encodeURIComponent(adminPw()), { method: 'DELETE' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Delete failed');
+        loadProducts();
+      })
+      .catch((err) => alert('Could not delete: ' + err.message));
   }
 
   function render(data) {
@@ -111,7 +348,10 @@
         <td>${(q.items || []).map((it) => it.name + ' x' + it.qty).join(', ')}</td>
         <td>${fmtZAR(q.grandTotal)}</td>
         <td><span class="pill ${q.status === 'pending_review' ? '' : 'done'}">${q.status || 'received'}</span></td>
-      </tr>`).join('') || '<tr><td colspan="8" class="muted">No quote requests yet</td></tr>';
+        <td>${q.status === 'sent'
+          ? '<span class="muted">Sent</span>'
+          : `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendQuote('${q.quoteNumber}', this)">Send to Client</button>`}</td>
+      </tr>`).join('') || '<tr><td colspan="9" class="muted">No quote requests yet</td></tr>';
 
     document.querySelector('#recent-views-table tbody').innerHTML = data.recentViews
       .map((v) => `<tr>
@@ -120,6 +360,27 @@
         <td>${v.referrer || '—'}</td>
         <td>${v.ip || ''}</td>
       </tr>`).join('') || '<tr><td colspan="4" class="muted">No data yet</td></tr>';
+  }
+
+  function sendQuote(quoteNumber, btn) {
+    const pw = sessionStorage.getItem('lsc_admin_pw');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    fetch('/api/admin/send-quote?password=' + encodeURIComponent(pw), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quoteNumber }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        btn.outerHTML = '<span class="muted">Sent</span>';
+      })
+      .catch((err) => {
+        btn.disabled = false;
+        btn.textContent = 'Send to Client';
+        alert('Could not send: ' + err.message);
+      });
   }
 
   // Auto-login if password already stored in this session
