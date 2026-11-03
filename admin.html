@@ -65,6 +65,12 @@
   .mail-meta { font-size: 12px; color: #6b7074; margin-bottom: 14px; }
   .mail-body { font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
   .mail-empty { padding: 40px 20px; text-align: center; color: #aaa; font-size: 13px; }
+
+  .panel-tabs { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; border-bottom: 1px solid #e2e4e1; padding-bottom: 0; }
+  .panel-tab { background: none; border: none; padding: 10px 18px; font-size: 14px; font-weight: 600; color: #6b7074; cursor: pointer; font-family: inherit; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .panel-tab.active { color: #0d5559; border-bottom-color: #0d5559; }
+  .panel { display: none; }
+  .panel.active { display: block; }
 </style>
 </head>
 <body>
@@ -82,58 +88,75 @@
     <h1>Life Style Ceramics — Dashboard</h1>
     <p class="muted" id="refreshed"></p>
 
-    <section>
-      <div class="section-head">
-        <h2 style="font-size:16px;margin:0;">Email — sales@lyfestyleceramics.co.za</h2>
-        <button class="btn" style="padding:8px 16px;font-size:12px;" onclick="loadMail(currentMailFolder)">Refresh</button>
-      </div>
-      <div class="mail-tabs">
-        <button class="mail-tab active" id="tab-inbox" onclick="switchMailTab('inbox')">Inbox</button>
-        <button class="mail-tab" id="tab-outbox" onclick="switchMailTab('outbox')">Outbox</button>
-      </div>
-      <div class="unibox">
-        <div class="mail-list" id="mail-list">
-          <div class="mail-empty">Loading…</div>
+    <div class="panel-tabs">
+      <button class="panel-tab active" id="ptab-overview" onclick="switchPanel('overview')">Overview</button>
+      <button class="panel-tab" id="ptab-email" onclick="switchPanel('email')">Email</button>
+      <button class="panel-tab" id="ptab-products" onclick="switchPanel('products')">Products</button>
+      <button class="panel-tab" id="ptab-quotes" onclick="switchPanel('quotes')">Quotes</button>
+      <button class="panel-tab" id="ptab-visitors" onclick="switchPanel('visitors')">Visitors</button>
+    </div>
+
+    <div class="panel active" id="panel-overview">
+      <section>
+        <h2 style="font-size:16px;">Overview</h2>
+        <div class="cards" id="summary-cards"></div>
+      </section>
+    </div>
+
+    <div class="panel" id="panel-email">
+      <section>
+        <div class="section-head">
+          <h2 style="font-size:16px;margin:0;">Email — sales@lyfestyleceramics.co.za</h2>
+          <button class="btn" style="padding:8px 16px;font-size:12px;" onclick="loadMail(currentMailFolder)">Refresh</button>
         </div>
-        <div class="mail-reading-pane" id="mail-reading-pane">
-          <div class="mail-empty">Select a message to read it</div>
+        <div class="mail-tabs">
+          <button class="mail-tab active" id="tab-inbox" onclick="switchMailTab('inbox')">Inbox</button>
+          <button class="mail-tab" id="tab-outbox" onclick="switchMailTab('outbox')">Outbox</button>
         </div>
-      </div>
-    </section>
+        <div class="unibox">
+          <div class="mail-list" id="mail-list">
+            <div class="mail-empty">Loading…</div>
+          </div>
+          <div class="mail-reading-pane" id="mail-reading-pane">
+            <div class="mail-empty">Select a message to read it</div>
+          </div>
+        </div>
+      </section>
+    </div>
 
-    <section>
-      <h2 style="font-size:16px;">Visitors (last 7 days)</h2>
-      <div class="cards" id="summary-cards"></div>
-    </section>
+    <div class="panel" id="panel-products">
+      <section>
+        <div class="section-head">
+          <h2 style="font-size:16px;margin:0;">Products</h2>
+          <button class="btn" onclick="openProductForm()">+ Add Product</button>
+        </div>
+        <table id="products-table">
+          <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price (ZAR)</th><th>Stock</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
 
-    <section>
-      <div class="section-head">
-        <h2 style="font-size:16px;margin:0;">Products</h2>
-        <button class="btn" onclick="openProductForm()">+ Add Product</button>
-      </div>
-      <table id="products-table">
-        <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price (ZAR)</th><th>Stock</th><th>Actions</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
+    <div class="panel" id="panel-quotes">
+      <section>
+        <h2 style="font-size:16px;">Quote Requests</h2>
+        <table id="quotes-table">
+          <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
 
-    <section>
-      <h2 style="font-size:16px;">Top Pages (all time)</h2>
-      <table id="top-pages-table"><thead><tr><th>Page</th><th>Views</th></tr></thead><tbody></tbody></table>
-    </section>
-
-    <section>
-      <h2 style="font-size:16px;">Quote Requests</h2>
-      <table id="quotes-table">
-        <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
-
-    <section>
-      <h2 style="font-size:16px;">Recent Page Views</h2>
-      <table id="recent-views-table"><thead><tr><th>Time</th><th>Page</th><th>Referrer</th><th>IP</th></tr></thead><tbody></tbody></table>
-    </section>
+    <div class="panel" id="panel-visitors">
+      <section>
+        <h2 style="font-size:16px;">Top Pages (all time)</h2>
+        <table id="top-pages-table"><thead><tr><th>Page</th><th>Views</th></tr></thead><tbody></tbody></table>
+      </section>
+      <section>
+        <h2 style="font-size:16px;">Recent Page Views</h2>
+        <table id="recent-views-table"><thead><tr><th>Time</th><th>Page</th><th>Referrer</th><th>IP</th></tr></thead><tbody></tbody></table>
+      </section>
+    </div>
   </div>
 </div>
 
@@ -431,6 +454,14 @@
         btn.textContent = 'Send to Client';
         alert('Could not send: ' + err.message);
       });
+  }
+
+  // ---------- Panel tabs ----------
+  function switchPanel(name) {
+    ['overview', 'email', 'products', 'quotes', 'visitors'].forEach((p) => {
+      document.getElementById('panel-' + p).classList.toggle('active', p === name);
+      document.getElementById('ptab-' + p).classList.toggle('active', p === name);
+    });
   }
 
   // ---------- Unibox: real Inbox/Outbox pulled live via IMAP ----------
