@@ -1344,7 +1344,7 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
   }
   .nav-links.nav-links-open { display: flex; }
   .nav-links > li { width: 100%; }
-  .nav-links a { padding: 14px 24px; width: 100%; }
+  .nav-links a { padding: 14px 24px; width: 100%; color: var(--dark); }
 
   .megamenu {
     position: static;
