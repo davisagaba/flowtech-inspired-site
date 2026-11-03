@@ -66,9 +66,10 @@
     <section>
       <div class="section-head">
         <h2 style="font-size:16px;margin:0;">Email — sales@lyfestyleceramics.co.za</h2>
-        <a class="btn" style="text-decoration:none;" href="https://email.godaddy.com" target="_blank" rel="noopener">Open Webmail (Inbox &amp; Outbox) ↗</a>
+        <a class="btn" style="text-decoration:none;" href="https://email.godaddy.com" target="_blank" rel="noopener" id="webmail-fallback-link">Open in New Tab ↗</a>
       </div>
-      <p class="muted" style="margin-top:0;">Opens GoDaddy's full webmail in a new tab — inbox, sent, drafts, compose and all other tools, logged in as your mailbox.</p>
+      <p class="muted" style="margin-top:0;" id="webmail-note">Loading webmail inside the panel…</p>
+      <iframe id="webmail-frame" src="https://email.godaddy.com" style="width:100%;height:640px;border:1px solid #e2e4e1;border-radius:14px;background:#fff;" title="Webmail"></iframe>
     </section>
 
     <section>
@@ -401,6 +402,35 @@
         alert('Could not send: ' + err.message);
       });
   }
+
+  // Webmail providers commonly block iframing (X-Frame-Options/CSP) to stop
+  // clickjacking, so detect a blocked/blank frame and fall back to a clear
+  // "open in new tab" message instead of leaving a dead empty box.
+  (function initWebmailFrame() {
+    const frame = document.getElementById('webmail-frame');
+    const note = document.getElementById('webmail-note');
+    let settled = false;
+
+    function markBlocked() {
+      if (settled) return;
+      settled = true;
+      frame.style.display = 'none';
+      note.innerHTML = 'Your browser blocked this from loading inside the panel (GoDaddy does not allow its webmail to be embedded). Use "Open in New Tab" above instead.';
+    }
+
+    function markLoaded() {
+      if (settled) return;
+      settled = true;
+      note.textContent = '';
+    }
+
+    // Cross-origin frames can't be inspected by JS either way, and a blocked
+    // frame still fires 'load' in most browsers — so 'load' only clears the
+    // loading message optimistically; the timeout is the real fallback check.
+    frame.addEventListener('load', markLoaded);
+    frame.addEventListener('error', markBlocked);
+    setTimeout(() => { if (!settled) note.textContent = 'If nothing appears above, GoDaddy is blocking the embed — use "Open in New Tab".'; }, 4000);
+  })();
 
   // Auto-login if password already stored in this session
   const stored = sessionStorage.getItem('lsc_admin_pw');
