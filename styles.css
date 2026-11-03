@@ -86,6 +86,7 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
   display: inline-block;
 }
 .nav-links a:hover { opacity: 0.8; }
+.mobile-nav-extra { display: none; }
 
 .megamenu {
   position: absolute;
@@ -1327,8 +1328,10 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
 
   .nav-toggle { display: flex; }
   .nav-enquire { display: none; }
-  #account-btn, #cart-btn { display: none; }
+  #account-btn { display: none; }
   .footer-bottom-inner { padding-left: 76px; row-gap: 10px; }
+  .mobile-nav-extra { display: block !important; }
+  .mobile-nav-extra a { font-weight: 700; color: var(--red) !important; }
 
   .nav-links {
     display: none;
