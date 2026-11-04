@@ -1307,11 +1307,42 @@
           <div class="stage-stepper">${stageStepperHtml(q.stage)}</div>
         </div>`).join('') || '<p class="muted">None</p>'}
       ${c.documents.length ? `<h4 style="margin:14px 0 6px;">Documents</h4>${c.documents.map((d) => `<div style="font-size:13px;margin-bottom:4px;">${d.docNumber} (${d.type}) — ${fmtZAR(d.total)}</div>`).join('')}` : ''}
+      <h4 style="margin:14px 0 6px;">Email Correspondence</h4>
+      <p class="muted" style="margin:0 0 6px;">Auto-detected from the live mailbox by matching this client's email address.</p>
+      <div id="client-email-thread"><p class="muted">Loading…</p></div>
       <h4 style="margin:14px 0 6px;">Notes</h4>
       <textarea id="client-notes" style="width:100%;min-height:80px;padding:8px;border:1px solid #e2e4e1;border-radius:10px;font-family:inherit;font-size:13px;">${c.notes || ''}</textarea>
       <button class="btn" style="margin-top:8px;padding:8px 16px;font-size:12px;" onclick="saveClientNotes('${c.email}')">Save Notes</button>
       <p class="muted" id="client-notes-status"></p>
     `;
+    loadClientEmailThread(c.email);
+  }
+
+  function loadClientEmailThread(email) {
+    const container = document.getElementById('client-email-thread');
+    fetch('/api/admin/clients/' + encodeURIComponent(email) + '/emails?' + authQS(), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed to load');
+        const thread = data.thread || [];
+        if (thread.length === 0) {
+          container.innerHTML = '<p class="muted">No matching emails found in Inbox or Outbox.</p>';
+          return;
+        }
+        container.innerHTML = thread.map((m) => `
+          <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f1f1ef;">
+            <span class="pill ${m.direction === 'sent' ? 'done' : ''}" style="flex-shrink:0;">${m.direction === 'sent' ? 'Sent' : 'Received'}</span>
+            <div style="min-width:0;flex:1;">
+              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.subject}</div>
+              <div style="font-size:12px;color:#8a8e90;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.snippet || ''}</div>
+            </div>
+            <div style="font-size:11px;color:#aaa;flex-shrink:0;white-space:nowrap;">${new Date(m.date).toLocaleDateString('en-ZA')}</div>
+          </div>
+        `).join('');
+      })
+      .catch((err) => {
+        container.innerHTML = '<p class="muted">Could not load email history: ' + err.message + '</p>';
+      });
   }
 
   function saveClientNotes(email) {

@@ -770,6 +770,37 @@ app.put('/admin/clients/:email/notes', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// Auto-detects every real email exchanged with this client by matching their
+// address against the live mailbox (Inbox + Sent) — no manual linking, this
+// connects automatically off the address on file for the quote.
+app.get('/admin/clients/:email/emails', requireAdmin, async (req, res) => {
+  try {
+    const target = decodeURIComponent(req.params.email).toLowerCase();
+    if (!target) return res.status(400).json({ ok: false, error: 'Missing email.' });
+
+    const sentFolder = await findSentFolder();
+    const [inbox, outbox] = await Promise.all([
+      fetchMailbox('INBOX', 100),
+      fetchMailbox(sentFolder, 100),
+    ]);
+
+    const matches = (addr) => String(addr || '').toLowerCase().includes(target);
+
+    const received = inbox
+      .filter((m) => matches(m.fromAddress) || matches(m.from))
+      .map((m) => ({ direction: 'received', subject: m.subject, date: m.date, snippet: m.snippet, seen: m.seen }));
+    const sent = outbox
+      .filter((m) => matches(m.to))
+      .map((m) => ({ direction: 'sent', subject: m.subject, date: m.date, snippet: m.snippet, seen: true }));
+
+    const thread = [...received, ...sent].sort((a, b) => new Date(b.date) - new Date(a.date));
+    res.json({ ok: true, thread });
+  } catch (err) {
+    console.error('Client email thread error:', err);
+    res.status(500).json({ ok: false, error: 'Could not load email history.' });
+  }
+});
+
 // --- Documents: Invoices & Receipts (built on top of the existing Quote flow) ---
 const DOCUMENTS_DIR = '/opt/lifestyle-ceramics/backend/documents-private';
 if (!fs.existsSync(DOCUMENTS_DIR)) fs.mkdirSync(DOCUMENTS_DIR, { recursive: true });
