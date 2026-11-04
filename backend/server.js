@@ -44,6 +44,28 @@ function saveSettings(settings) {
   fs.writeFileSync(SETTINGS_JSON, JSON.stringify(settings, null, 2));
 }
 
+// --- Reply templates (reusable canned replies, with {{name}} etc. tokens) ---
+const TEMPLATES_JSON = '/opt/lifestyle-ceramics/backend/reply-templates.json';
+const DEFAULT_TEMPLATES = [
+  { id: 'followup', name: 'Follow-up', body: 'Hi {{name}},\n\nJust following up on your recent enquiry. Please let us know if you have any questions or would like to proceed.\n\nKind regards,\nLife Style Ceramics' },
+  { id: 'stock-check', name: 'Checking Stock', body: 'Hi {{name}},\n\nThank you for your patience — we are confirming stock availability for your requested items and will update you shortly.\n\nKind regards,\nLife Style Ceramics' },
+  { id: 'thank-you', name: 'Thank You', body: 'Hi {{name}},\n\nThank you for your business! Please don\'t hesitate to reach out if you need anything further.\n\nKind regards,\nLife Style Ceramics' },
+];
+function loadTemplates() {
+  if (!fs.existsSync(TEMPLATES_JSON)) {
+    fs.writeFileSync(TEMPLATES_JSON, JSON.stringify(DEFAULT_TEMPLATES, null, 2));
+    return DEFAULT_TEMPLATES;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(TEMPLATES_JSON, 'utf8'));
+  } catch {
+    return DEFAULT_TEMPLATES;
+  }
+}
+function saveTemplates(templates) {
+  fs.writeFileSync(TEMPLATES_JSON, JSON.stringify(templates, null, 2));
+}
+
 const mailer = nodemailer.createTransport({
   host: process.env.LSC_SMTP_HOST || 'smtpout.secureserver.net',
   port: Number(process.env.LSC_SMTP_PORT) || 465,
@@ -643,6 +665,44 @@ app.put('/admin/settings', requireAdmin, requireOwner, (req, res) => {
   res.json({ ok: true, settings });
 });
 
+// --- Reply templates ---
+// Readable by any signed-in user (staff need these when replying); managed
+// (add/edit/delete) by admins only, same as other shared configuration.
+app.get('/admin/templates', requireAdmin, (req, res) => {
+  res.json({ ok: true, templates: loadTemplates() });
+});
+
+app.post('/admin/templates', requireAdmin, requireOwner, (req, res) => {
+  const { name, body } = req.body || {};
+  if (!name || !body) return res.status(400).json({ ok: false, error: 'Missing name or body.' });
+  const templates = loadTemplates();
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + crypto.randomBytes(2).toString('hex');
+  templates.push({ id, name, body });
+  saveTemplates(templates);
+  logActivity(req.adminUser, 'added_template', name);
+  res.json({ ok: true, template: { id, name, body } });
+});
+
+app.put('/admin/templates/:id', requireAdmin, requireOwner, (req, res) => {
+  const { name, body } = req.body || {};
+  const templates = loadTemplates();
+  const idx = templates.findIndex((t) => t.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'Template not found.' });
+  if (name) templates[idx].name = name;
+  if (body) templates[idx].body = body;
+  saveTemplates(templates);
+  logActivity(req.adminUser, 'edited_template', templates[idx].name);
+  res.json({ ok: true, template: templates[idx] });
+});
+
+app.delete('/admin/templates/:id', requireAdmin, requireOwner, (req, res) => {
+  const templates = loadTemplates();
+  const removed = templates.find((t) => t.id === req.params.id);
+  saveTemplates(templates.filter((t) => t.id !== req.params.id));
+  logActivity(req.adminUser, 'deleted_template', removed ? removed.name : req.params.id);
+  res.json({ ok: true });
+});
+
 // --- Admin users (named logins) ---
 app.get('/admin/users', requireAdmin, requireOwner, (req, res) => {
   res.json({ ok: true, users: loadUsers().map((u) => ({ username: u.username, role: u.role })) });
@@ -799,6 +859,27 @@ app.get('/admin/clients/:email/emails', requireAdmin, async (req, res) => {
     console.error('Client email thread error:', err);
     res.status(500).json({ ok: false, error: 'Could not load email history.' });
   }
+});
+
+// Every quote/invoice/receipt PDF already generated for this client, for the
+// "Attach Document" picker in Reply — adjustable per send, never forced.
+app.get('/admin/clients/:email/documents', requireAdmin, (req, res) => {
+  const target = decodeURIComponent(req.params.email).toLowerCase();
+
+  const quotesByNumber = new Map();
+  readJsonLines(LOG_PATH).forEach((q) => quotesByNumber.set(q.quoteNumber, q));
+  const quoteDocs = [...quotesByNumber.values()]
+    .filter((q) => (q.email || '').toLowerCase() === target && q.pdfPath && fs.existsSync(q.pdfPath))
+    .map((q) => ({ type: 'quote', id: q.quoteNumber, label: `Quote ${q.quoteNumber} (${formatZAR(q.grandTotal)})`, date: q.date }));
+
+  const docsByNumber = new Map();
+  readJsonLines(DOCUMENTS_LOG).forEach((d) => docsByNumber.set(d.docNumber, d));
+  const otherDocs = [...docsByNumber.values()]
+    .filter((d) => (d.email || '').toLowerCase() === target && d.pdfPath && fs.existsSync(d.pdfPath))
+    .map((d) => ({ type: 'document', id: d.docNumber, label: `${d.type === 'invoice' ? 'Invoice' : 'Receipt'} ${d.docNumber} (${formatZAR(d.total)})`, date: d.date }));
+
+  const documents = [...quoteDocs, ...otherDocs].sort((a, b) => new Date(b.date) - new Date(a.date));
+  res.json({ ok: true, documents });
 });
 
 // --- Documents: Invoices & Receipts (built on top of the existing Quote flow) ---
@@ -1158,9 +1239,29 @@ app.get('/admin/mailbox/outbox', requireAdmin, async (req, res) => {
 // Send a new email (compose, or reply when inReplyTo/references are given),
 // and append a copy into the Sent folder so Outbox reflects it immediately
 // (GoDaddy's SMTP relay does not auto-save sent mail like Gmail/M365 do).
+// Resolves {type: 'quote'|'document', id} refs to real PDF paths already on
+// disk (quotes-private or documents-private), so a reply can attach an
+// existing quote/invoice/receipt without re-uploading it.
+function resolveDocumentRefs(documentRefs) {
+  if (!Array.isArray(documentRefs) || documentRefs.length === 0) return [];
+  const quotesByNumber = new Map();
+  readJsonLines(LOG_PATH).forEach((q) => quotesByNumber.set(q.quoteNumber, q));
+  const docsByNumber = new Map();
+  readJsonLines(DOCUMENTS_LOG).forEach((d) => docsByNumber.set(d.docNumber, d));
+
+  return documentRefs
+    .map((ref) => {
+      const record = ref.type === 'quote' ? quotesByNumber.get(ref.id) : docsByNumber.get(ref.id);
+      return record && record.pdfPath && fs.existsSync(record.pdfPath)
+        ? { path: record.pdfPath, filename: path.basename(record.pdfPath) }
+        : null;
+    })
+    .filter(Boolean);
+}
+
 app.post('/admin/mailbox/send', requireAdmin, async (req, res) => {
   try {
-    const { to, subject, body, inReplyTo, references, attachmentIds } = req.body || {};
+    const { to, subject, body, inReplyTo, references, attachmentIds, documentRefs } = req.body || {};
     if (!to || !subject || !body) {
       return res.status(400).json({ ok: false, error: 'Missing to, subject or body.' });
     }
@@ -1171,13 +1272,19 @@ app.post('/admin/mailbox/send', requireAdmin, async (req, res) => {
         .filter((p) => fs.existsSync(p))
       : [];
 
+    const resolvedDocs = resolveDocumentRefs(documentRefs);
+    const allAttachments = [
+      ...attachmentFiles.map((p) => ({ path: p })),
+      ...resolvedDocs,
+    ];
+
     const mailOptions = {
       from: `"Life Style Ceramics" <${process.env.LSC_SMTP_USER}>`,
       to,
       subject,
       text: body,
       ...(inReplyTo ? { inReplyTo, references: references || inReplyTo } : {}),
-      ...(attachmentFiles.length ? { attachments: attachmentFiles.map((p) => ({ path: p })) } : {}),
+      ...(allAttachments.length ? { attachments: allAttachments } : {}),
     };
 
     await mailer.sendMail(mailOptions);

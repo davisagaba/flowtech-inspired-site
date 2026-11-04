@@ -160,9 +160,10 @@
   .unread-badge:empty { display: none; }
   .reply-btn { margin-top: 16px; }
   .inline-reply { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; background: #fafaf9; }
-  .reply-toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+  .reply-toolbar { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
   .reply-toolbar button { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: inherit; }
   .reply-toolbar button:hover { background: #eee; }
+  .reply-toolbar select { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; cursor: pointer; font-family: inherit; max-width: 170px; }
   .inline-reply textarea { width: 100%; min-height: 120px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; resize: vertical; }
   .attach-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .attach-chip { display: inline-flex; align-items: center; gap: 6px; background: #eaf5f4; color: var(--teal); font-size: 12px; padding: 4px 10px; border-radius: 999px; }
@@ -409,6 +410,17 @@
 
     <div class="panel" id="panel-settings">
       <section>
+        <div class="section-head">
+          <h2 style="font-size:16px;margin:0;">Reply Templates</h2>
+          <button class="btn" onclick="openTemplateForm()">+ Add Template</button>
+        </div>
+        <p class="muted" style="margin-top:0;">Available to all staff when replying to emails. Use {{name}} to auto-insert the recipient's name.</p>
+        <table id="templates-table">
+          <thead><tr><th>Name</th><th>Preview</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section>
         <h2 style="font-size:16px;">Document Template Settings</h2>
         <p class="muted" style="margin-top:0;">Controls the branding and footer text used on every Quote, Invoice and Receipt PDF.</p>
         <div class="form-row">
@@ -468,6 +480,26 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeReceiptModal()">Cancel</button>
       <button class="btn" onclick="submitReceipt()">Generate Receipt</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="template-modal">
+  <div class="modal">
+    <h3 id="template-modal-title">Add Template</h3>
+    <input type="hidden" id="t-id">
+    <div class="form-row">
+      <label>Name</label>
+      <input type="text" id="t-name" placeholder="e.g. Follow-up">
+    </div>
+    <div class="form-row">
+      <label>Body (use {{name}} for the recipient's name)</label>
+      <textarea id="t-body" style="min-height:140px;" placeholder="Hi {{name}}, ..."></textarea>
+    </div>
+    <p class="muted" id="template-status"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeTemplateForm()">Cancel</button>
+      <button class="btn" onclick="saveTemplate()">Save Template</button>
     </div>
   </div>
 </div>
@@ -1061,6 +1093,7 @@
   function showInlineReply(i) {
     const m = currentMailMessages[i];
     replyAttachments = [];
+    replyDocumentRefs = [];
     document.getElementById('reply-toggle-btn').style.display = 'none';
     const box = document.getElementById('inline-reply-box');
     box.innerHTML = `
@@ -1069,6 +1102,12 @@
           <button type="button" title="Insert bullet list" onclick="insertBulletList()">• List</button>
           <button type="button" title="Attach a file" onclick="document.getElementById('reply-attach-input').click()">📎 Attach</button>
           <input type="file" id="reply-attach-input" style="display:none" onchange="uploadReplyAttachment(this)">
+          <select id="reply-template-select" onchange="applyReplyTemplate(this, '${(m.from || '').replace(/'/g, "\\'")}')">
+            <option value="">Insert template…</option>
+          </select>
+          <select id="reply-doc-select" onchange="addReplyDocument(this)">
+            <option value="">Attach document…</option>
+          </select>
         </div>
         <textarea id="reply-body" placeholder="Write your reply…">\n\n---\nOn ${fmtMailDate(m.date)}, ${m.from} wrote:\n${(m.body || '').split('\n').map((l) => '> ' + l).join('\n')}</textarea>
         <div class="attach-chips" id="reply-attach-chips"></div>
@@ -1080,10 +1119,13 @@
       </div>
     `;
     document.getElementById('reply-body').focus();
+    populateReplyTemplates();
+    populateReplyDocuments(m.fromAddress);
   }
 
   function cancelInlineReply() {
     replyAttachments = [];
+    replyDocumentRefs = [];
     document.getElementById('inline-reply-box').innerHTML = '';
     document.getElementById('reply-toggle-btn').style.display = '';
   }
@@ -1126,13 +1168,83 @@
   }
 
   function renderReplyAttachChips() {
-    document.getElementById('reply-attach-chips').innerHTML = replyAttachments.map((a, idx) => `
+    const fileChips = replyAttachments.map((a, idx) => `
       <span class="attach-chip">${a.filename}<button onclick="removeReplyAttachment(${idx})">×</button></span>
     `).join('');
+    const docChips = replyDocumentRefs.map((d, idx) => `
+      <span class="attach-chip" style="background:#eef3ff;color:#2850b8;">📄 ${d.label}<button onclick="removeReplyDocument(${idx})" style="color:#2850b8;">×</button></span>
+    `).join('');
+    document.getElementById('reply-attach-chips').innerHTML = fileChips + docChips;
   }
 
   function removeReplyAttachment(idx) {
     replyAttachments.splice(idx, 1);
+    renderReplyAttachChips();
+  }
+
+  // ---------- Reply templates ----------
+  function populateReplyTemplates() {
+    fetch('/api/admin/templates?' + authQS())
+      .then((r) => r.json())
+      .then((data) => {
+        const select = document.getElementById('reply-template-select');
+        if (!select || !data.ok) return;
+        (data.templates || []).forEach((t) => {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.name;
+          opt.dataset.body = t.body;
+          select.appendChild(opt);
+        });
+      });
+  }
+
+  function applyReplyTemplate(select, fromName) {
+    const opt = select.selectedOptions[0];
+    if (!opt || !opt.dataset.body) return;
+    const displayName = (fromName || '').replace(/<.*/, '').trim() || 'there';
+    const filled = opt.dataset.body.replace(/\{\{name\}\}/g, displayName);
+    const textarea = document.getElementById('reply-body');
+    textarea.value = filled + '\n' + textarea.value;
+    select.value = '';
+    textarea.focus();
+  }
+
+  // ---------- Attach existing client documents (adjustable per reply) ----------
+  let replyDocumentRefs = [];
+  function populateReplyDocuments(clientEmail) {
+    const select = document.getElementById('reply-doc-select');
+    if (!select || !clientEmail) return;
+    fetch('/api/admin/clients/' + encodeURIComponent(clientEmail) + '/documents?' + authQS())
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok || !data.documents.length) {
+          select.innerHTML = '<option value="">No documents on file</option>';
+          select.disabled = true;
+          return;
+        }
+        data.documents.forEach((d, idx) => {
+          const opt = document.createElement('option');
+          opt.value = idx;
+          opt.textContent = d.label;
+          opt.dataset.type = d.type;
+          opt.dataset.id = d.id;
+          opt.dataset.label = d.label;
+          select.appendChild(opt);
+        });
+      });
+  }
+
+  function addReplyDocument(select) {
+    const opt = select.selectedOptions[0];
+    if (!opt || !opt.dataset.id) return;
+    replyDocumentRefs.push({ type: opt.dataset.type, id: opt.dataset.id, label: opt.dataset.label });
+    renderReplyAttachChips();
+    select.value = '';
+  }
+
+  function removeReplyDocument(idx) {
+    replyDocumentRefs.splice(idx, 1);
     renderReplyAttachChips();
   }
 
@@ -1154,6 +1266,7 @@
         body,
         inReplyTo: m.messageId || undefined,
         attachmentIds: replyAttachments.map((a) => a.id),
+        documentRefs: replyDocumentRefs.map((d) => ({ type: d.type, id: d.id })),
       }),
     })
       .then((r) => r.json())
@@ -1489,7 +1602,75 @@
   }
 
   // ---------- Settings (document template) ----------
+  // ---------- Reply template management (Settings tab) ----------
+  let currentTemplates = [];
+  function loadTemplatesTab() {
+    fetch('/api/admin/templates?' + authQS(), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        currentTemplates = data.templates || [];
+        document.querySelector('#templates-table tbody').innerHTML = currentTemplates.map((t) => `
+          <tr>
+            <td>${t.name}</td>
+            <td class="muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.body.replace(/\n/g, ' ')}</td>
+            <td>
+              <button class="btn-outline-sm" onclick="openTemplateForm('${t.id}')">Edit</button>
+              <button class="btn-danger-sm" onclick="deleteTemplate('${t.id}')">Delete</button>
+            </td>
+          </tr>
+        `).join('') || '<tr><td colspan="3" class="muted">No templates yet</td></tr>';
+      });
+  }
+
+  function openTemplateForm(id) {
+    const t = id ? currentTemplates.find((x) => x.id === id) : null;
+    document.getElementById('template-modal-title').textContent = t ? 'Edit Template' : 'Add Template';
+    document.getElementById('t-id').value = t ? t.id : '';
+    document.getElementById('t-name').value = t ? t.name : '';
+    document.getElementById('t-body').value = t ? t.body : '';
+    document.getElementById('template-status').textContent = '';
+    document.getElementById('template-modal').classList.add('open');
+  }
+  function closeTemplateForm() {
+    document.getElementById('template-modal').classList.remove('open');
+  }
+  function saveTemplate() {
+    const id = document.getElementById('t-id').value;
+    const name = document.getElementById('t-name').value.trim();
+    const body = document.getElementById('t-body').value.trim();
+    if (!name || !body) {
+      document.getElementById('template-status').textContent = 'Name and body are required.';
+      return;
+    }
+    const url = '/api/admin/templates' + (id ? '/' + id : '') + '?' + authQS();
+    fetch(url, {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, body }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        closeTemplateForm();
+        loadTemplatesTab();
+      })
+      .catch((err) => {
+        document.getElementById('template-status').textContent = 'Error: ' + err.message;
+      });
+  }
+  function deleteTemplate(id) {
+    if (!confirm('Delete this template?')) return;
+    fetch('/api/admin/templates/' + id + '?' + authQS(), { method: 'DELETE' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        loadTemplatesTab();
+      })
+      .catch((err) => alert('Could not delete: ' + err.message));
+  }
+
   function loadSettingsForm() {
+    loadTemplatesTab();
     fetch('/api/admin/settings?' + authQS())
       .then((r) => r.json())
       .then((data) => {
