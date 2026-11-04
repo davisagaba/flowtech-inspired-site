@@ -104,8 +104,12 @@
       <button class="panel-tab active" id="ptab-overview" onclick="switchPanel('overview')">Overview</button>
       <button class="panel-tab" id="ptab-email" onclick="switchPanel('email')">Email</button>
       <button class="panel-tab" id="ptab-products" onclick="switchPanel('products')">Products</button>
+      <button class="panel-tab" id="ptab-stock" onclick="switchPanel('stock')">Stock</button>
       <button class="panel-tab" id="ptab-quotes" onclick="switchPanel('quotes')">Quotes</button>
+      <button class="panel-tab" id="ptab-clients" onclick="switchPanel('clients')">Clients</button>
+      <button class="panel-tab" id="ptab-documents" onclick="switchPanel('documents')">Documents</button>
       <button class="panel-tab" id="ptab-visitors" onclick="switchPanel('visitors')">Visitors</button>
+      <button class="panel-tab" id="ptab-settings" onclick="switchPanel('settings')">Settings</button>
     </div>
 
     <div class="panel active" id="panel-overview">
@@ -153,11 +157,55 @@
       </section>
     </div>
 
+    <div class="panel" id="panel-stock">
+      <section>
+        <h2 style="font-size:16px;">Stock Alerts</h2>
+        <div class="cards" id="stock-summary-cards"></div>
+      </section>
+      <section>
+        <h2 style="font-size:16px;">Stock Levels</h2>
+        <table id="stock-table">
+          <thead><tr><th>Image</th><th>Name</th><th>Code</th><th>Qty on Hand</th><th>Adjust</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section>
+        <h2 style="font-size:16px;">Recent Stock Changes</h2>
+        <table id="stock-history-table">
+          <thead><tr><th>Date</th><th>Product</th><th>Change</th><th>New Qty</th><th>Reason</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+
     <div class="panel" id="panel-quotes">
       <section>
         <h2 style="font-size:16px;">Quote Requests</h2>
         <table id="quotes-table">
           <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+
+    <div class="panel" id="panel-clients">
+      <section>
+        <h2 style="font-size:16px;">Clients</h2>
+        <div class="unibox" style="min-height:420px;">
+          <div class="mail-list" id="clients-list"><div class="mail-empty">Loading…</div></div>
+          <div class="mail-reading-pane" id="client-detail-pane"><div class="mail-empty">Select a client to view their history</div></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="panel" id="panel-documents">
+      <section>
+        <div class="section-head">
+          <h2 style="font-size:16px;margin:0;">Documents — Invoices &amp; Receipts</h2>
+          <button class="btn-outline-sm" onclick="loadDocuments()">Refresh</button>
+        </div>
+        <table id="documents-table">
+          <thead><tr><th>Doc #</th><th>Type</th><th>Reference</th><th>Client</th><th>Total</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </section>
@@ -172,6 +220,66 @@
         <h2 style="font-size:16px;">Recent Page Views</h2>
         <table id="recent-views-table"><thead><tr><th>Time</th><th>Page</th><th>Referrer</th><th>IP</th></tr></thead><tbody></tbody></table>
       </section>
+    </div>
+
+    <div class="panel" id="panel-settings">
+      <section>
+        <h2 style="font-size:16px;">Document Template Settings</h2>
+        <p class="muted" style="margin-top:0;">Controls the branding and footer text used on every Quote, Invoice and Receipt PDF.</p>
+        <div class="form-row">
+          <label>Company Name</label>
+          <input type="text" id="s-companyName">
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label>Tagline</label>
+            <input type="text" id="s-tagline">
+          </div>
+          <div class="form-row">
+            <label>Accent Color</label>
+            <input type="color" id="s-accentColor" style="height:40px;padding:4px;">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>VAT Number (optional)</label>
+          <input type="text" id="s-vatNumber">
+        </div>
+        <div class="form-row">
+          <label>Banking Details (shown on Invoices/Receipts, optional)</label>
+          <textarea id="s-bankDetails" placeholder="Bank, account name, account number, branch code..."></textarea>
+        </div>
+        <div class="form-row">
+          <label>Footer Terms Text</label>
+          <textarea id="s-footerTerms"></textarea>
+        </div>
+        <button class="btn" onclick="saveSettings()">Save Settings</button>
+        <p class="muted" id="settings-status" style="margin-top:10px;"></p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="receipt-modal">
+  <div class="modal">
+    <h3>Record Payment / Generate Receipt</h3>
+    <input type="hidden" id="r-invoice-number">
+    <div class="form-row">
+      <label>Amount Paid (ZAR)</label>
+      <input type="number" step="0.01" id="r-amount">
+    </div>
+    <div class="form-row">
+      <label>Payment Method</label>
+      <select id="r-method">
+        <option>EFT</option>
+        <option>Cash</option>
+        <option>Card</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <p class="muted" id="receipt-status"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeReceiptModal()">Cancel</button>
+      <button class="btn" onclick="submitReceipt()">Generate Receipt</button>
     </div>
   </div>
 </div>
@@ -461,9 +569,12 @@
         <td>${(q.items || []).map((it) => it.name + ' x' + it.qty).join(', ')}</td>
         <td>${fmtZAR(q.grandTotal)}</td>
         <td><span class="pill ${q.status === 'pending_review' ? '' : 'done'}">${q.status || 'received'}</span></td>
-        <td>${q.status === 'sent'
-          ? '<span class="muted">Sent</span>'
-          : `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendQuote('${q.quoteNumber}', this)">Send to Client</button>`}</td>
+        <td>
+          ${q.status === 'sent'
+            ? '<span class="muted">Sent</span>'
+            : `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendQuote('${q.quoteNumber}', this)">Send to Client</button>`}
+          <button class="btn-outline-sm" onclick="generateInvoice('${q.quoteNumber}', this)">Generate Invoice</button>
+        </td>
       </tr>`).join('') || '<tr><td colspan="9" class="muted">No quote requests yet</td></tr>';
 
     document.querySelector('#recent-views-table tbody').innerHTML = data.recentViews
@@ -497,11 +608,16 @@
   }
 
   // ---------- Panel tabs ----------
+  const PANEL_NAMES = ['overview', 'email', 'products', 'stock', 'quotes', 'clients', 'documents', 'visitors', 'settings'];
   function switchPanel(name) {
-    ['overview', 'email', 'products', 'quotes', 'visitors'].forEach((p) => {
+    PANEL_NAMES.forEach((p) => {
       document.getElementById('panel-' + p).classList.toggle('active', p === name);
       document.getElementById('ptab-' + p).classList.toggle('active', p === name);
     });
+    if (name === 'stock') loadStock();
+    if (name === 'clients') loadClients();
+    if (name === 'documents') loadDocuments();
+    if (name === 'settings') loadSettingsForm();
   }
 
   // ---------- Unibox: real Inbox/Outbox pulled live via IMAP ----------
@@ -771,6 +887,269 @@
       })
       .catch((err) => {
         status.textContent = 'Error: ' + err.message;
+      });
+  }
+
+  // ---------- Stock control ----------
+  function loadStock() {
+    Promise.all([
+      fetch('/api/admin/stock/summary?password=' + encodeURIComponent(adminPw())).then((r) => r.json()),
+      fetch('/api/admin/products?password=' + encodeURIComponent(adminPw())).then((r) => r.json()),
+      fetch('/api/admin/stock/history?password=' + encodeURIComponent(adminPw()) + '&limit=30').then((r) => r.json()),
+    ]).then(([summary, productsRes, historyRes]) => {
+      document.getElementById('stock-summary-cards').innerHTML = `
+        <div class="card"><div class="num">${summary.outOfStock.length}</div><div class="label">Out of stock</div></div>
+        <div class="card"><div class="num">${summary.lowStock.length}</div><div class="label">Low stock (&le; ${summary.lowStockThreshold})</div></div>
+      `;
+
+      const products = productsRes.products || [];
+      document.querySelector('#stock-table tbody').innerHTML = products.map((p) => {
+        const thumb = (p.images && p.images[0])
+          ? (String(p.images[0]).startsWith('http') || String(p.images[0]).startsWith('/uploads/')
+              ? p.images[0]
+              : `https://images.pexels.com/photos/${p.images[0]}/pexels-photo-${p.images[0]}.jpeg?auto=compress&cs=tinysrgb&w=80`)
+          : '';
+        const qty = Number(p.stockQty) || 0;
+        const qtyClass = qty === 0 ? 'color:#c0392b;font-weight:700;' : qty <= 5 ? 'color:#b8860b;font-weight:700;' : '';
+        return `<tr>
+          <td>${thumb ? `<img class="prod-thumb" src="${thumb}">` : '—'}</td>
+          <td>${p.name}</td>
+          <td>${p.code || ''}</td>
+          <td style="${qtyClass}">${qty}</td>
+          <td>
+            <button class="btn-outline-sm" onclick="adjustStock(${p.id}, -1)">&minus;</button>
+            <button class="btn-outline-sm" onclick="adjustStock(${p.id}, 1)">+</button>
+            <button class="btn-outline-sm" onclick="adjustStockPrompt(${p.id})">Set…</button>
+          </td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="5" class="muted">No products yet</td></tr>';
+
+      document.querySelector('#stock-history-table tbody').innerHTML = (historyRes.history || []).map((h) => `
+        <tr>
+          <td>${new Date(h.date).toLocaleString('en-ZA')}</td>
+          <td>${h.name}</td>
+          <td>${h.delta > 0 ? '+' : ''}${h.delta}</td>
+          <td>${h.newQty}</td>
+          <td>${h.reason || ''}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="muted">No stock changes yet</td></tr>';
+    });
+  }
+
+  function adjustStock(id, delta, reason) {
+    fetch('/api/admin/products/' + id + '/adjust-stock?password=' + encodeURIComponent(adminPw()), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delta, reason: reason || (delta > 0 ? 'Manual increase' : 'Manual decrease') }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Adjust failed');
+        loadStock();
+      })
+      .catch((err) => alert('Could not adjust stock: ' + err.message));
+  }
+
+  function adjustStockPrompt(id) {
+    const value = prompt('Set new stock quantity (whole number):');
+    if (value === null) return;
+    const newQty = Math.max(0, Number(value) || 0);
+    fetch('/api/admin/products?password=' + encodeURIComponent(adminPw()))
+      .then((r) => r.json())
+      .then((data) => {
+        const p = (data.products || []).find((x) => x.id === id);
+        const currentQty = p ? Number(p.stockQty) || 0 : 0;
+        adjustStock(id, newQty - currentQty, 'Manual set to ' + newQty);
+      });
+  }
+
+  // ---------- Clients (CRM) ----------
+  let currentClients = [];
+  function loadClients() {
+    const list = document.getElementById('clients-list');
+    list.innerHTML = '<div class="mail-empty">Loading…</div>';
+    fetch('/api/admin/clients?password=' + encodeURIComponent(adminPw()), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        currentClients = data.clients || [];
+        if (currentClients.length === 0) {
+          list.innerHTML = '<div class="mail-empty">No clients yet</div>';
+          return;
+        }
+        list.innerHTML = currentClients.map((c, i) => `
+          <div class="mail-row" data-i="${i}" onclick="openClient(${i})">
+            <div class="mail-from">${c.name || '(no name)'}</div>
+            <div class="mail-subject">${c.email}</div>
+            <div class="mail-snippet">${c.quotes.length} quote${c.quotes.length === 1 ? '' : 's'} · ${fmtZAR(c.totalValue)}</div>
+            <div class="mail-date">${new Date(c.lastActivity).toLocaleDateString('en-ZA')}</div>
+          </div>
+        `).join('');
+      });
+  }
+
+  function openClient(i) {
+    document.querySelectorAll('#clients-list .mail-row').forEach((row) => row.classList.remove('active'));
+    document.querySelector(`#clients-list .mail-row[data-i="${i}"]`)?.classList.add('active');
+    const c = currentClients[i];
+    document.getElementById('client-detail-pane').innerHTML = `
+      <h3>${c.name || '(no name)'}</h3>
+      <div class="mail-meta">
+        ${c.email}<br>
+        ${c.phone || ''}${c.company ? ' · ' + c.company : ''}<br>
+        Total value: ${fmtZAR(c.totalValue)} across ${c.quotes.length} quote(s)
+      </div>
+      <h4 style="margin-bottom:6px;">Quote History</h4>
+      ${c.quotes.map((q) => `<div style="font-size:13px;margin-bottom:4px;">${q.quoteNumber} — ${fmtZAR(q.grandTotal)} — <span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status || 'received'}</span></div>`).join('') || '<p class="muted">None</p>'}
+      ${c.documents.length ? `<h4 style="margin:14px 0 6px;">Documents</h4>${c.documents.map((d) => `<div style="font-size:13px;margin-bottom:4px;">${d.docNumber} (${d.type}) — ${fmtZAR(d.total)}</div>`).join('')}` : ''}
+      <h4 style="margin:14px 0 6px;">Notes</h4>
+      <textarea id="client-notes" style="width:100%;min-height:80px;padding:8px;border:1px solid #e2e4e1;border-radius:10px;font-family:inherit;font-size:13px;">${c.notes || ''}</textarea>
+      <button class="btn" style="margin-top:8px;padding:8px 16px;font-size:12px;" onclick="saveClientNotes('${c.email}')">Save Notes</button>
+      <p class="muted" id="client-notes-status"></p>
+    `;
+  }
+
+  function saveClientNotes(email) {
+    const notes = document.getElementById('client-notes').value;
+    fetch('/api/admin/clients/' + encodeURIComponent(email) + '/notes?password=' + encodeURIComponent(adminPw()), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        document.getElementById('client-notes-status').textContent = data.ok ? 'Saved.' : 'Error saving.';
+      });
+  }
+
+  // ---------- Documents (Invoices & Receipts) ----------
+  function loadDocuments() {
+    fetch('/api/admin/documents?password=' + encodeURIComponent(adminPw()), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        const docs = data.documents || [];
+        document.querySelector('#documents-table tbody').innerHTML = docs.map((d) => `
+          <tr>
+            <td>${d.docNumber}</td>
+            <td style="text-transform:capitalize;">${d.type}</td>
+            <td>${d.refNumber || ''}</td>
+            <td>${d.name || ''}<br><span class="muted">${d.email || ''}</span></td>
+            <td>${fmtZAR(d.total)}</td>
+            <td><span class="pill ${d.status === 'sent' ? 'done' : ''}">${d.status}</span></td>
+            <td>${new Date(d.date).toLocaleDateString('en-ZA')}</td>
+            <td>
+              <a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/documents/${d.docNumber}/download?password=${encodeURIComponent(adminPw())}" target="_blank">Download</a>
+              ${d.status !== 'sent' ? `<button class="btn-outline-sm" onclick="sendDocument('${d.docNumber}', this)">Send</button>` : ''}
+              ${d.type === 'invoice' ? `<button class="btn-outline-sm" onclick="openReceiptModal('${d.docNumber}')">Receipt</button>` : ''}
+            </td>
+          </tr>
+        `).join('') || '<tr><td colspan="8" class="muted">No documents yet</td></tr>';
+      });
+  }
+
+  function sendDocument(docNumber, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    fetch('/api/admin/documents/' + docNumber + '/send?password=' + encodeURIComponent(adminPw()), { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Send failed');
+        loadDocuments();
+        showMailToast('Document sent to client.');
+      })
+      .catch((err) => {
+        btn.disabled = false;
+        btn.textContent = 'Send';
+        alert('Could not send: ' + err.message);
+      });
+  }
+
+  function generateInvoice(quoteNumber, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    fetch('/api/admin/documents/invoice?password=' + encodeURIComponent(adminPw()), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quoteNumber }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        showMailToast('Invoice ' + data.docNumber + ' generated — see the Documents tab.');
+        btn.textContent = 'Invoice Created';
+      })
+      .catch((err) => {
+        btn.disabled = false;
+        btn.textContent = 'Generate Invoice';
+        alert('Could not generate invoice: ' + err.message);
+      });
+  }
+
+  function openReceiptModal(invoiceNumber) {
+    document.getElementById('r-invoice-number').value = invoiceNumber;
+    document.getElementById('r-amount').value = '';
+    document.getElementById('receipt-status').textContent = '';
+    document.getElementById('receipt-modal').classList.add('open');
+  }
+  function closeReceiptModal() {
+    document.getElementById('receipt-modal').classList.remove('open');
+  }
+  function submitReceipt() {
+    const invoiceNumber = document.getElementById('r-invoice-number').value;
+    const amountPaid = Number(document.getElementById('r-amount').value);
+    const paymentMethod = document.getElementById('r-method').value;
+    if (!amountPaid) {
+      document.getElementById('receipt-status').textContent = 'Enter an amount.';
+      return;
+    }
+    fetch('/api/admin/documents/receipt?password=' + encodeURIComponent(adminPw()), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceNumber, amountPaid, paymentMethod }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        closeReceiptModal();
+        loadDocuments();
+        showMailToast('Receipt ' + data.docNumber + ' generated.');
+      })
+      .catch((err) => {
+        document.getElementById('receipt-status').textContent = 'Error: ' + err.message;
+      });
+  }
+
+  // ---------- Settings (document template) ----------
+  function loadSettingsForm() {
+    fetch('/api/admin/settings?password=' + encodeURIComponent(adminPw()))
+      .then((r) => r.json())
+      .then((data) => {
+        const s = data.settings || {};
+        document.getElementById('s-companyName').value = s.companyName || '';
+        document.getElementById('s-tagline').value = s.tagline || '';
+        document.getElementById('s-accentColor').value = s.accentColor || '#0d5559';
+        document.getElementById('s-vatNumber').value = s.vatNumber || '';
+        document.getElementById('s-bankDetails').value = s.bankDetails || '';
+        document.getElementById('s-footerTerms').value = s.footerTerms || '';
+      });
+  }
+
+  function saveSettings() {
+    const payload = {
+      companyName: document.getElementById('s-companyName').value,
+      tagline: document.getElementById('s-tagline').value,
+      accentColor: document.getElementById('s-accentColor').value,
+      vatNumber: document.getElementById('s-vatNumber').value,
+      bankDetails: document.getElementById('s-bankDetails').value,
+      footerTerms: document.getElementById('s-footerTerms').value,
+    };
+    fetch('/api/admin/settings?password=' + encodeURIComponent(adminPw()), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        document.getElementById('settings-status').textContent = data.ok ? 'Saved — applies to new documents going forward.' : 'Error saving.';
       });
   }
 

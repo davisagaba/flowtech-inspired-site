@@ -22,6 +22,28 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const MAIL_ATTACHMENTS_DIR = '/opt/lifestyle-ceramics/backend/mail-attachments';
 if (!fs.existsSync(MAIL_ATTACHMENTS_DIR)) fs.mkdirSync(MAIL_ATTACHMENTS_DIR, { recursive: true });
 
+// --- Document template settings (used by Quote/Invoice/Receipt PDFs) ---
+const SETTINGS_JSON = '/opt/lifestyle-ceramics/backend/settings.json';
+const DEFAULT_SETTINGS = {
+  companyName: 'Life Style Ceramics',
+  tagline: 'Sanitaryware, Urinals & Basins',
+  accentColor: '#0d5559',
+  footerTerms: 'Prices include 15% VAT and are subject to confirmation of stock availability.',
+  bankDetails: '',
+  vatNumber: '',
+};
+function loadSettings() {
+  if (!fs.existsSync(SETTINGS_JSON)) return { ...DEFAULT_SETTINGS };
+  try {
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_JSON, 'utf8')) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+function saveSettings(settings) {
+  fs.writeFileSync(SETTINGS_JSON, JSON.stringify(settings, null, 2));
+}
+
 const mailer = nodemailer.createTransport({
   host: process.env.LSC_SMTP_HOST || 'smtpout.secureserver.net',
   port: Number(process.env.LSC_SMTP_PORT) || 465,
@@ -473,6 +495,325 @@ app.delete('/admin/products/:id', requireAdmin, (req, res) => {
   const products = loadProducts().filter((p) => p.id !== id);
   saveProducts(products);
   res.json({ ok: true });
+});
+
+// --- Stock control ---
+const STOCK_HISTORY_LOG = '/opt/lifestyle-ceramics/backend/stock-history.log';
+const LOW_STOCK_THRESHOLD = 5;
+
+app.post('/admin/products/:id/adjust-stock', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const { delta, reason } = req.body || {};
+  if (!Number.isFinite(Number(delta)) || Number(delta) === 0) {
+    return res.status(400).json({ ok: false, error: 'delta must be a non-zero number.' });
+  }
+  const products = loadProducts();
+  const idx = products.findIndex((p) => p.id === id);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'Product not found.' });
+
+  const prevQty = Number(products[idx].stockQty) || 0;
+  const newQty = Math.max(0, prevQty + Number(delta));
+  products[idx].stockQty = newQty;
+  products[idx].stock = newQty > 0;
+  saveProducts(products);
+
+  fs.appendFile(STOCK_HISTORY_LOG, JSON.stringify({
+    productId: id,
+    name: products[idx].name,
+    delta: Number(delta),
+    prevQty,
+    newQty,
+    reason: reason || '',
+    date: new Date().toISOString(),
+  }) + '\n', () => {});
+
+  res.json({ ok: true, product: products[idx] });
+});
+
+app.get('/admin/stock/history', requireAdmin, (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  res.json({ ok: true, history: readJsonLines(STOCK_HISTORY_LOG).reverse().slice(0, limit) });
+});
+
+app.get('/admin/stock/summary', requireAdmin, (req, res) => {
+  const products = loadProducts();
+  const lowStock = products.filter((p) => {
+    const qty = Number(p.stockQty);
+    return Number.isFinite(qty) && qty > 0 && qty <= LOW_STOCK_THRESHOLD;
+  });
+  const outOfStock = products.filter((p) => !p.stock);
+  res.json({ ok: true, lowStock, outOfStock, lowStockThreshold: LOW_STOCK_THRESHOLD });
+});
+
+// --- Settings (document template branding) ---
+app.get('/admin/settings', requireAdmin, (req, res) => {
+  res.json({ ok: true, settings: loadSettings() });
+});
+
+app.put('/admin/settings', requireAdmin, (req, res) => {
+  const settings = { ...loadSettings(), ...req.body };
+  saveSettings(settings);
+  res.json({ ok: true, settings });
+});
+
+// --- Client tracker (CRM) ---
+// Built from existing quote-requests.log, enriched with any manually-saved
+// notes in clients.json (keyed by lowercased email).
+const CLIENTS_JSON = '/opt/lifestyle-ceramics/backend/clients.json';
+function loadClientNotes() {
+  if (!fs.existsSync(CLIENTS_JSON)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(CLIENTS_JSON, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+function saveClientNotes(notes) {
+  fs.writeFileSync(CLIENTS_JSON, JSON.stringify(notes, null, 2));
+}
+
+app.get('/admin/clients', requireAdmin, (req, res) => {
+  const quotes = readJsonLines(LOG_PATH);
+  const docs = readJsonLines(DOCUMENTS_LOG);
+  const notes = loadClientNotes();
+  const byEmail = new Map();
+
+  quotes.forEach((q) => {
+    const key = (q.email || '').toLowerCase();
+    if (!key) return;
+    if (!byEmail.has(key)) {
+      byEmail.set(key, {
+        email: q.email, name: q.name, phone: q.phone, company: q.company,
+        quotes: [], documents: [], totalValue: 0, lastActivity: q.date,
+      });
+    }
+    const c = byEmail.get(key);
+    c.quotes.push({ quoteNumber: q.quoteNumber, date: q.date, grandTotal: q.grandTotal, status: q.status });
+    c.totalValue += Number(q.grandTotal) || 0;
+    if (new Date(q.date) > new Date(c.lastActivity)) c.lastActivity = q.date;
+    // Latest quote wins for display name/phone/company in case of updates.
+    if (new Date(q.date) >= new Date(c.lastActivity)) {
+      c.name = q.name; c.phone = q.phone; c.company = q.company;
+    }
+  });
+
+  docs.forEach((d) => {
+    const key = (d.email || '').toLowerCase();
+    if (!key || !byEmail.has(key)) return;
+    byEmail.get(key).documents.push({ docNumber: d.docNumber, type: d.type, date: d.date, total: d.total });
+  });
+
+  const clients = [...byEmail.values()].map((c) => ({
+    ...c,
+    notes: notes[c.email.toLowerCase()] || '',
+  })).sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+
+  res.json({ ok: true, clients });
+});
+
+app.put('/admin/clients/:email/notes', requireAdmin, (req, res) => {
+  const email = decodeURIComponent(req.params.email).toLowerCase();
+  const notes = loadClientNotes();
+  notes[email] = (req.body && req.body.notes) || '';
+  saveClientNotes(notes);
+  res.json({ ok: true });
+});
+
+// --- Documents: Invoices & Receipts (built on top of the existing Quote flow) ---
+const DOCUMENTS_DIR = '/opt/lifestyle-ceramics/backend/documents-private';
+if (!fs.existsSync(DOCUMENTS_DIR)) fs.mkdirSync(DOCUMENTS_DIR, { recursive: true });
+const DOCUMENTS_LOG = '/opt/lifestyle-ceramics/backend/documents.log';
+
+function nextDocNumber(prefix) {
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const rand = crypto.randomBytes(2).toString('hex').toUpperCase();
+  return `${prefix}-${stamp}-${rand}`;
+}
+
+// Shared layout for Invoice/Receipt PDFs — mirrors the existing Quote PDF
+// styling, pulling company branding from settings.json.
+function buildDocumentPdf({ docType, docNumber, name, email, phone, company, items, grandTotal, extraLines, refNumber }) {
+  const settings = loadSettings();
+  const filename = `${docType.toLowerCase()}-${docNumber}.pdf`;
+  const filePath = path.join(DOCUMENTS_DIR, filename);
+  const doc = new PDFDocument({ margin: 50 });
+  const stream = fs.createWriteStream(filePath);
+  doc.pipe(stream);
+
+  doc.fontSize(20).fillColor(settings.accentColor).text(settings.companyName);
+  doc.fontSize(10).fillColor('#444').text(settings.tagline || '');
+  doc.moveDown(0.3);
+  doc.fontSize(12).fillColor('#444').text(docType);
+  doc.moveDown(1.2);
+
+  doc.fontSize(10).fillColor('#000');
+  doc.text(`${docType} Number: ${docNumber}`);
+  if (refNumber) doc.text(`Reference: ${refNumber}`);
+  doc.text(`Date: ${new Date().toLocaleDateString('en-ZA')}`);
+  if (settings.vatNumber) doc.text(`VAT Number: ${settings.vatNumber}`);
+  doc.moveDown(1);
+
+  doc.fontSize(11).fillColor('#000').text('Billed to:', { underline: true });
+  doc.fontSize(10).text(name || '');
+  if (company) doc.text(company);
+  if (email) doc.text(email);
+  if (phone) doc.text(phone);
+  doc.moveDown(1.5);
+
+  if (items && items.length) {
+    const tableTop = doc.y;
+    doc.fontSize(10).fillColor('#444');
+    doc.text('Item', 50, tableTop, { width: 220 });
+    doc.text('Code', 270, tableTop, { width: 90 });
+    doc.text('Qty', 360, tableTop, { width: 40, align: 'right' });
+    doc.text('Unit Price', 400, tableTop, { width: 80, align: 'right' });
+    doc.text('Line Total', 480, tableTop, { width: 70, align: 'right' });
+    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).strokeColor('#ccc').stroke();
+
+    let y = tableTop + 22;
+    doc.fillColor('#000');
+    items.forEach((it) => {
+      doc.fontSize(9);
+      doc.text(String(it.name || ''), 50, y, { width: 220 });
+      doc.text(String(it.code || ''), 270, y, { width: 90 });
+      doc.text(String(it.qty || 1), 360, y, { width: 40, align: 'right' });
+      doc.text(formatZAR(Number(it.unitPrice) || 0), 400, y, { width: 80, align: 'right' });
+      doc.text(formatZAR(Number(it.lineTotal) || 0), 480, y, { width: 70, align: 'right' });
+      y += 20;
+    });
+    doc.moveTo(50, y + 5).lineTo(550, y + 5).strokeColor('#ccc').stroke();
+    doc.fontSize(11).fillColor(settings.accentColor).text(
+      `Total (incl. 15% VAT): ${formatZAR(grandTotal)}`, 50, y + 15, { width: 500, align: 'right' }
+    );
+    doc.moveDown(2);
+  }
+
+  if (extraLines && extraLines.length) {
+    doc.fontSize(10).fillColor('#000');
+    extraLines.forEach((line) => doc.text(line));
+    doc.moveDown(1);
+  }
+
+  if (settings.bankDetails) {
+    doc.fontSize(9).fillColor('#444').text('Banking Details:', { underline: true });
+    doc.fontSize(9).fillColor('#444').text(settings.bankDetails);
+    doc.moveDown(1);
+  }
+
+  doc.fontSize(8).fillColor('#888').text(settings.footerTerms || '', { width: 500 });
+  doc.end();
+
+  return { filePath, filename, streamPromise: new Promise((resolve, reject) => {
+    stream.on('finish', resolve);
+    stream.on('error', reject);
+  }) };
+}
+
+app.post('/admin/documents/invoice', requireAdmin, async (req, res) => {
+  try {
+    const { quoteNumber } = req.body || {};
+    if (!quoteNumber) return res.status(400).json({ ok: false, error: 'Missing quoteNumber.' });
+    const quotesByNumber = new Map();
+    readJsonLines(LOG_PATH).forEach((q) => quotesByNumber.set(q.quoteNumber, q));
+    const quote = quotesByNumber.get(quoteNumber);
+    if (!quote) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+
+    const docNumber = nextDocNumber('INV');
+    const { filePath, streamPromise } = buildDocumentPdf({
+      docType: 'Invoice',
+      docNumber,
+      name: quote.name, email: quote.email, phone: quote.phone, company: quote.company,
+      items: quote.items, grandTotal: quote.grandTotal,
+      refNumber: quote.quoteNumber,
+    });
+    await streamPromise;
+
+    const entry = {
+      docNumber, type: 'invoice', refNumber: quoteNumber,
+      name: quote.name, email: quote.email, total: quote.grandTotal,
+      date: new Date().toISOString(), status: 'issued', pdfPath: filePath,
+    };
+    fs.appendFile(DOCUMENTS_LOG, JSON.stringify(entry) + '\n', () => {});
+    res.json({ ok: true, docNumber });
+  } catch (err) {
+    console.error('Invoice generation error:', err);
+    res.status(500).json({ ok: false, error: 'Could not generate invoice.' });
+  }
+});
+
+app.post('/admin/documents/receipt', requireAdmin, async (req, res) => {
+  try {
+    const { invoiceNumber, amountPaid, paymentMethod } = req.body || {};
+    if (!invoiceNumber || !amountPaid) {
+      return res.status(400).json({ ok: false, error: 'Missing invoiceNumber or amountPaid.' });
+    }
+    const docsByNumber = new Map();
+    readJsonLines(DOCUMENTS_LOG).forEach((d) => docsByNumber.set(d.docNumber, d));
+    const invoice = docsByNumber.get(invoiceNumber);
+    if (!invoice) return res.status(404).json({ ok: false, error: 'Invoice not found.' });
+
+    const docNumber = nextDocNumber('REC');
+    const { filePath, streamPromise } = buildDocumentPdf({
+      docType: 'Receipt',
+      docNumber,
+      name: invoice.name, email: invoice.email,
+      items: null, grandTotal: null,
+      refNumber: invoice.docNumber,
+      extraLines: [
+        `Amount Paid: ${formatZAR(Number(amountPaid))}`,
+        `Payment Method: ${paymentMethod || 'Not specified'}`,
+        `For Invoice: ${invoice.docNumber}`,
+      ],
+    });
+    await streamPromise;
+
+    const entry = {
+      docNumber, type: 'receipt', refNumber: invoiceNumber,
+      name: invoice.name, email: invoice.email, total: Number(amountPaid),
+      date: new Date().toISOString(), status: 'issued', pdfPath: filePath,
+    };
+    fs.appendFile(DOCUMENTS_LOG, JSON.stringify(entry) + '\n', () => {});
+    res.json({ ok: true, docNumber });
+  } catch (err) {
+    console.error('Receipt generation error:', err);
+    res.status(500).json({ ok: false, error: 'Could not generate receipt.' });
+  }
+});
+
+app.get('/admin/documents', requireAdmin, (req, res) => {
+  const byNumber = new Map();
+  readJsonLines(DOCUMENTS_LOG).forEach((d) => byNumber.set(d.docNumber, d));
+  res.json({ ok: true, documents: [...byNumber.values()].reverse() });
+});
+
+app.get('/admin/documents/:docNumber/download', requireAdmin, (req, res) => {
+  const docs = readJsonLines(DOCUMENTS_LOG);
+  const doc = [...docs].reverse().find((d) => d.docNumber === req.params.docNumber);
+  if (!doc || !fs.existsSync(doc.pdfPath)) return res.status(404).json({ ok: false, error: 'Document not found.' });
+  res.download(doc.pdfPath, path.basename(doc.pdfPath));
+});
+
+app.post('/admin/documents/:docNumber/send', requireAdmin, async (req, res) => {
+  try {
+    const docs = readJsonLines(DOCUMENTS_LOG);
+    const doc = [...docs].reverse().find((d) => d.docNumber === req.params.docNumber);
+    if (!doc || !fs.existsSync(doc.pdfPath)) return res.status(404).json({ ok: false, error: 'Document not found.' });
+    const settings = loadSettings();
+
+    await mailer.sendMail({
+      from: `"${settings.companyName}" <${process.env.LSC_SMTP_USER}>`,
+      to: doc.email,
+      subject: `Your ${doc.type === 'invoice' ? 'Invoice' : 'Receipt'} ${doc.docNumber} — ${settings.companyName}`,
+      text: `Hi ${doc.name},\n\nPlease find your ${doc.type} ${doc.docNumber} attached.\n\nKind regards,\n${settings.companyName}`,
+      attachments: [{ filename: path.basename(doc.pdfPath), path: doc.pdfPath }],
+    });
+
+    fs.appendFile(DOCUMENTS_LOG, JSON.stringify({ ...doc, status: 'sent', sentAt: new Date().toISOString() }) + '\n', () => {});
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Document send error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 const upload = multer({
