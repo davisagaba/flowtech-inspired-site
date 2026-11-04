@@ -661,9 +661,32 @@ app.post('/admin/users', requireAdmin, requireOwner, (req, res) => {
   res.json({ ok: true });
 });
 
+app.put('/admin/users/:username', requireAdmin, requireOwner, (req, res) => {
+  const { role, password } = req.body || {};
+  const users = loadUsers();
+  const idx = users.findIndex((u) => u.username === req.params.username);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'User not found.' });
+
+  const adminCount = users.filter((u) => u.role === 'admin').length;
+  if (role && role !== 'admin' && users[idx].role === 'admin' && adminCount <= 1) {
+    return res.status(400).json({ ok: false, error: 'Cannot demote the last remaining admin.' });
+  }
+
+  if (role) users[idx].role = role;
+  if (password) users[idx].password = password;
+  saveUsers(users);
+  logActivity(req.adminUser, 'edited_user', `${req.params.username}${role ? ' -> role: ' + role : ''}${password ? ' (password changed)' : ''}`);
+  res.json({ ok: true, user: { username: users[idx].username, role: users[idx].role } });
+});
+
 app.delete('/admin/users/:username', requireAdmin, requireOwner, (req, res) => {
   const users = loadUsers();
   if (users.length <= 1) return res.status(400).json({ ok: false, error: 'Cannot delete the last remaining user.' });
+  const target = users.find((u) => u.username === req.params.username);
+  const adminCount = users.filter((u) => u.role === 'admin').length;
+  if (target && target.role === 'admin' && adminCount <= 1) {
+    return res.status(400).json({ ok: false, error: 'Cannot delete the last remaining admin.' });
+  }
   const filtered = users.filter((u) => u.username !== req.params.username);
   saveUsers(filtered);
   logActivity(req.adminUser, 'removed_user', req.params.username);

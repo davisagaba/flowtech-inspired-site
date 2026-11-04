@@ -464,19 +464,28 @@
 
 <div class="modal-overlay" id="user-modal">
   <div class="modal">
-    <h3>Add Admin User</h3>
+    <h3 id="user-modal-title">Add User</h3>
+    <input type="hidden" id="u-edit-mode" value="add">
     <div class="form-row">
       <label>Username</label>
       <input type="text" id="u-username" autocomplete="off">
     </div>
     <div class="form-row">
-      <label>Password</label>
-      <input type="text" id="u-password" autocomplete="off">
+      <label id="u-password-label">Password</label>
+      <input type="text" id="u-password" autocomplete="off" placeholder="Leave blank to keep current password">
+    </div>
+    <div class="form-row">
+      <label>Role</label>
+      <select id="u-role">
+        <option value="staff">Staff (day-to-day access)</option>
+        <option value="admin">Admin (full access)</option>
+      </select>
+      <p class="muted" style="margin-top:6px;">Admins can manage Settings, Users, the Activity Log, and delete products. Staff cannot.</p>
     </div>
     <p class="muted" id="user-status"></p>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeUserForm()">Cancel</button>
-      <button class="btn" onclick="saveUser()">Add User</button>
+      <button class="btn" id="user-save-btn" onclick="saveUser()">Add User</button>
     </div>
   </div>
 </div>
@@ -1538,40 +1547,63 @@
   }
 
   // ---------- Admin users ----------
+  let currentUsers = [];
   function loadUsersTab() {
     fetch('/api/admin/users?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
-        document.querySelector('#users-table tbody').innerHTML = (data.users || []).map((u) => `
+        currentUsers = data.users || [];
+        document.querySelector('#users-table tbody').innerHTML = currentUsers.map((u) => `
           <tr>
             <td>${u.username}</td>
-            <td>${u.role}</td>
-            <td>${data.users.length > 1 ? `<button class="btn-danger-sm" onclick="deleteUser('${u.username}')">Remove</button>` : '<span class="muted">Last user</span>'}</td>
+            <td><span class="pill ${u.role === 'admin' ? 'done' : ''}">${u.role}</span></td>
+            <td>
+              <button class="btn-outline-sm" onclick="openUserForm('${u.username}')">Edit</button>
+              ${currentUsers.length > 1 ? `<button class="btn-danger-sm" onclick="deleteUser('${u.username}')">Remove</button>` : '<span class="muted">Last user</span>'}
+            </td>
           </tr>
         `).join('');
       });
   }
 
-  function openUserForm() {
-    document.getElementById('u-username').value = '';
+  function openUserForm(username) {
+    const editing = !!username;
+    document.getElementById('u-edit-mode').value = editing ? 'edit' : 'add';
+    document.getElementById('user-modal-title').textContent = editing ? 'Edit User' : 'Add User';
+    document.getElementById('user-save-btn').textContent = editing ? 'Save Changes' : 'Add User';
+    document.getElementById('u-username').value = editing ? username : '';
+    document.getElementById('u-username').disabled = editing;
     document.getElementById('u-password').value = '';
+    document.getElementById('u-password-label').textContent = editing ? 'New Password (optional)' : 'Password';
+    const existing = editing ? currentUsers.find((u) => u.username === username) : null;
+    document.getElementById('u-role').value = existing ? existing.role : 'staff';
     document.getElementById('user-status').textContent = '';
     document.getElementById('user-modal').classList.add('open');
   }
   function closeUserForm() {
     document.getElementById('user-modal').classList.remove('open');
+    document.getElementById('u-username').disabled = false;
   }
   function saveUser() {
+    const editing = document.getElementById('u-edit-mode').value === 'edit';
     const username = document.getElementById('u-username').value.trim();
     const password = document.getElementById('u-password').value;
-    if (!username || !password) {
-      document.getElementById('user-status').textContent = 'Username and password are required.';
+    const role = document.getElementById('u-role').value;
+
+    if (!username || (!editing && !password)) {
+      document.getElementById('user-status').textContent = editing ? 'Username is required.' : 'Username and password are required.';
       return;
     }
-    fetch('/api/admin/users?' + authQS(), {
-      method: 'POST',
+
+    const url = '/api/admin/users' + (editing ? '/' + encodeURIComponent(username) : '') + '?' + authQS();
+    const body = editing
+      ? { role, ...(password ? { password } : {}) }
+      : { username, password, role };
+
+    fetch(url, {
+      method: editing ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify(body),
     })
       .then((r) => r.json())
       .then((data) => {
