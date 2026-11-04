@@ -131,20 +131,30 @@
   .mail-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
   .mail-tab { background: var(--surface); border: 1px solid var(--border); color: #444; padding: 8px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
   .mail-tab.active { background: var(--teal); color: #fff; border-color: var(--teal); }
-  .unibox { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 0; background: var(--surface); border-radius: var(--radius); overflow: hidden; min-height: 420px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-  .mail-list { border-right: 1px solid var(--border); max-height: 560px; overflow-y: auto; }
-  .mail-row { padding: 13px 16px; border-bottom: 1px solid #f1f1ef; cursor: pointer; transition: background .1s; }
+  .unibox { display: grid; grid-template-columns: minmax(280px, 1fr) 2fr; gap: 0; background: var(--surface); border-radius: var(--radius); overflow: hidden; min-height: 420px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+  .mail-list { border-right: 1px solid var(--border); max-height: 600px; overflow-y: auto; }
+  .mail-row { display: flex; gap: 11px; align-items: flex-start; padding: 13px 16px; border-bottom: 1px solid #f1f1ef; border-left: 3px solid transparent; cursor: pointer; transition: background .1s, border-color .1s; }
   .mail-row:hover { background: #fafbfc; }
-  .mail-row.active { background: #eaf5f4; }
-  .mail-row.unread .mail-from { font-weight: 800; }
-  .mail-from { font-size: 13px; }
-  .mail-subject { font-size: 13px; color: #333; margin: 2px 0; }
+  .mail-row.active { background: #eaf5f4; border-left-color: var(--teal); }
+  .mail-row.unread { background: #fbfdfc; }
+  .mail-row.unread .mail-from { font-weight: 800; color: var(--text); }
+  .mail-row.unread .mail-avatar { background: linear-gradient(135deg, var(--teal-light), var(--teal)); box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(13,85,89,.25); }
+  .mail-avatar { width: 34px; height: 34px; border-radius: 50%; background: #c4c9cc; color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .mail-avatar-lg { width: 42px; height: 42px; font-size: 15px; background: linear-gradient(135deg, var(--teal-light), var(--teal)) !important; box-shadow: none !important; }
+  .mail-row-body { min-width: 0; flex: 1; }
+  .mail-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .mail-from { font-size: 13px; font-weight: 600; color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mail-date { font-size: 11px; color: #aaa; flex-shrink: 0; }
+  .mail-subject { font-size: 13px; color: #333; margin: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mail-snippet { font-size: 12px; color: #8a8e90; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mail-date { font-size: 11px; color: #aaa; }
-  .mail-reading-pane { padding: 22px; max-height: 560px; overflow-y: auto; }
-  .mail-reading-pane h3 { margin: 0 0 6px; font-size: 16px; }
-  .mail-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
-  .mail-body { font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
+  .mail-reading-pane { padding: 22px; max-height: 600px; overflow-y: auto; }
+  .reading-header { display: flex; gap: 14px; align-items: flex-start; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .reading-header-text { min-width: 0; flex: 1; }
+  .reading-header h3 { margin: 0 0 8px; font-size: 16px; line-height: 1.35; }
+  .mail-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-muted); }
+  .mail-meta strong { color: #777; font-weight: 600; margin-right: 4px; }
+  .mail-body { font-size: 13.5px; white-space: pre-wrap; line-height: 1.65; color: #272b2d; }
+  .quoted-line { display: block; color: #a0a4a7; border-left: 2px solid #e2e4e1; padding-left: 10px; margin: 1px 0; }
   .mail-empty { padding: 40px 20px; text-align: center; color: #aaa; font-size: 13px; }
   .unread-badge { display: inline-block; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
   .unread-badge:empty { display: none; }
@@ -943,6 +953,15 @@
     return isNaN(d) ? '' : d.toLocaleString('en-ZA', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
+  // Dims quoted "> ..." lines (previous message in a reply chain) so the
+  // actual new reply content stands out instead of one undifferentiated wall.
+  function formatMailBody(body) {
+    const escaped = (body || '(no content)').replace(/</g, '&lt;');
+    return escaped.split('\n').map((line) =>
+      /^\s*>/.test(line) ? `<span class="quoted-line">${line}</span>` : line
+    ).join('\n');
+  }
+
   function updateUnreadBadge() {
     const count = currentMailFolder === 'inbox' ? currentMailMessages.filter((m) => !m.seen).length : 0;
     document.getElementById('inbox-unread-badge').textContent = count > 0 ? count : '';
@@ -982,14 +1001,22 @@
       return;
     }
 
-    list.innerHTML = filtered.map(({ m, i }) => `
+    list.innerHTML = filtered.map(({ m, i }) => {
+      const party = (folder === 'inbox' ? m.from : m.to) || '(unknown)';
+      const initial = party.replace(/<.*/, '').trim().charAt(0).toUpperCase() || '?';
+      return `
       <div class="mail-row ${m.seen ? '' : 'unread'} ${i === openMailIndex ? 'active' : ''}" data-i="${i}" onclick="openMailMessage(${i})">
-        <div class="mail-from">${(folder === 'inbox' ? m.from : m.to) || '(unknown)'}</div>
-        <div class="mail-subject">${m.subject}</div>
-        <div class="mail-snippet">${m.snippet || ''}</div>
-        <div class="mail-date">${fmtMailDate(m.date)}</div>
-      </div>
-    `).join('');
+        <div class="mail-avatar">${initial}</div>
+        <div class="mail-row-body">
+          <div class="mail-row-top">
+            <span class="mail-from">${party}</span>
+            <span class="mail-date">${fmtMailDate(m.date)}</span>
+          </div>
+          <div class="mail-subject">${m.subject}</div>
+          <div class="mail-snippet">${m.snippet || ''}</div>
+        </div>
+      </div>`;
+    }).join('');
   }
 
   function openMailMessage(i) {
@@ -997,14 +1024,20 @@
     document.querySelectorAll('.mail-row').forEach((row) => row.classList.remove('active'));
     document.querySelector(`.mail-row[data-i="${i}"]`)?.classList.add('active');
     const m = currentMailMessages[i];
+    const headerInitial = (m.from || '?').replace(/<.*/, '').trim().charAt(0).toUpperCase() || '?';
     document.getElementById('mail-reading-pane').innerHTML = `
-      <h3>${m.subject}</h3>
-      <div class="mail-meta">
-        From: ${m.from || '—'}<br>
-        To: ${m.to || '—'}<br>
-        ${fmtMailDate(m.date)}
+      <div class="reading-header">
+        <div class="mail-avatar mail-avatar-lg">${headerInitial}</div>
+        <div class="reading-header-text">
+          <h3>${m.subject}</h3>
+          <div class="mail-meta">
+            <span><strong>From</strong> ${m.from || '—'}</span>
+            <span><strong>To</strong> ${m.to || '—'}</span>
+            <span>${fmtMailDate(m.date)}</span>
+          </div>
+        </div>
       </div>
-      <div class="mail-body">${(m.body || '').replace(/</g, '&lt;') || '(no content)'}</div>
+      <div class="mail-body">${formatMailBody(m.body)}</div>
       ${currentMailFolder === 'inbox' ? `<button class="btn reply-btn" id="reply-toggle-btn" onclick="showInlineReply(${i})">Reply</button><div id="inline-reply-box"></div>` : ''}
     `;
 
