@@ -879,7 +879,22 @@ app.get('/admin/clients/:email/documents', requireAdmin, (req, res) => {
     .map((d) => ({ type: 'document', id: d.docNumber, label: `${d.type === 'invoice' ? 'Invoice' : 'Receipt'} ${d.docNumber} (${formatZAR(d.total)})`, date: d.date }));
 
   const documents = [...quoteDocs, ...otherDocs].sort((a, b) => new Date(b.date) - new Date(a.date));
-  res.json({ ok: true, documents });
+
+  // Client summary for template tailoring (name/company + most recent
+  // quote details) — so a template can reference more than just {{name}}.
+  const clientQuotes = [...quotesByNumber.values()]
+    .filter((q) => (q.email || '').toLowerCase() === target)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const latest = clientQuotes[0];
+  const client = latest ? {
+    name: latest.name || '',
+    company: latest.company || '',
+    phone: latest.phone || '',
+    latestQuoteNumber: latest.quoteNumber,
+    latestAmount: formatZAR(latest.grandTotal),
+  } : null;
+
+  res.json({ ok: true, documents, client });
 });
 
 // --- Documents: Invoices & Receipts (built on top of the existing Quote flow) ---

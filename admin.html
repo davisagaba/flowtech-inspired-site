@@ -414,7 +414,7 @@
           <h2 style="font-size:16px;margin:0;">Reply Templates</h2>
           <button class="btn" onclick="openTemplateForm()">+ Add Template</button>
         </div>
-        <p class="muted" style="margin-top:0;">Available to all staff when replying to emails. Use {{name}} to auto-insert the recipient's name.</p>
+        <p class="muted" style="margin-top:0;">Available to all staff when replying to emails. Tokens auto-fill from that client's own record: {{name}}, {{company}}, {{quote}} (latest quote number), {{amount}} (latest quote total).</p>
         <table id="templates-table">
           <thead><tr><th>Name</th><th>Preview</th><th>Actions</th></tr></thead>
           <tbody></tbody>
@@ -493,7 +493,7 @@
       <input type="text" id="t-name" placeholder="e.g. Follow-up">
     </div>
     <div class="form-row">
-      <label>Body (use {{name}} for the recipient's name)</label>
+      <label>Body — tokens: {{name}}, {{company}}, {{quote}}, {{amount}}</label>
       <textarea id="t-body" style="min-height:140px;" placeholder="Hi {{name}}, ..."></textarea>
     </div>
     <p class="muted" id="template-status"></p>
@@ -1199,11 +1199,20 @@
       });
   }
 
+  // Filled in by populateReplyDocuments() with this client's name/company/
+  // latest quote so templates can reference more than just {{name}}.
+  let currentReplyClient = null;
+
   function applyReplyTemplate(select, fromName) {
     const opt = select.selectedOptions[0];
     if (!opt || !opt.dataset.body) return;
-    const displayName = (fromName || '').replace(/<.*/, '').trim() || 'there';
-    const filled = opt.dataset.body.replace(/\{\{name\}\}/g, displayName);
+    const c = currentReplyClient;
+    const displayName = (c && c.name) || (fromName || '').replace(/<.*/, '').trim() || 'there';
+    const filled = opt.dataset.body
+      .replace(/\{\{name\}\}/g, displayName)
+      .replace(/\{\{company\}\}/g, (c && c.company) || '')
+      .replace(/\{\{quote\}\}/g, (c && c.latestQuoteNumber) || '')
+      .replace(/\{\{amount\}\}/g, (c && c.latestAmount) || '');
     const textarea = document.getElementById('reply-body');
     textarea.value = filled + '\n' + textarea.value;
     select.value = '';
@@ -1214,10 +1223,12 @@
   let replyDocumentRefs = [];
   function populateReplyDocuments(clientEmail) {
     const select = document.getElementById('reply-doc-select');
+    currentReplyClient = null;
     if (!select || !clientEmail) return;
     fetch('/api/admin/clients/' + encodeURIComponent(clientEmail) + '/documents?' + authQS())
       .then((r) => r.json())
       .then((data) => {
+        currentReplyClient = data.client || null;
         if (!data.ok || !data.documents.length) {
           select.innerHTML = '<option value="">No documents on file</option>';
           select.disabled = true;
