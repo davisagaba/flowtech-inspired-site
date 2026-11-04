@@ -165,6 +165,9 @@
   .reply-toolbar button:hover { background: #eee; }
   .reply-toolbar select { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; cursor: pointer; font-family: inherit; max-width: 170px; }
   .inline-reply textarea { width: 100%; min-height: 120px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; resize: vertical; }
+  .quoted-original { margin-top: 10px; border-left: 3px solid var(--border); background: #f7f8f8; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 10px 14px; max-height: 220px; overflow-y: auto; }
+  .quoted-original-head { font-size: 11.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+  .quoted-original-body { font-size: 12.5px; color: #80848a; white-space: pre-wrap; line-height: 1.55; }
   .attach-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .attach-chip { display: inline-flex; align-items: center; gap: 6px; background: #eaf5f4; color: var(--teal); font-size: 12px; padding: 4px 10px; border-radius: 999px; }
   .attach-chip button { background: none; border: none; color: var(--teal); cursor: pointer; font-weight: 700; font-size: 13px; padding: 0; }
@@ -1109,7 +1112,11 @@
             <option value="">Attach document…</option>
           </select>
         </div>
-        <textarea id="reply-body" placeholder="Write your reply…">\n\n---\nOn ${fmtMailDate(m.date)}, ${m.from} wrote:\n${(m.body || '').split('\n').map((l) => '> ' + l).join('\n')}</textarea>
+        <textarea id="reply-body" placeholder="Write your reply…"></textarea>
+        <div class="quoted-original">
+          <div class="quoted-original-head">On ${fmtMailDate(m.date)}, ${(m.from || '').replace(/</g, '&lt;')} wrote:</div>
+          <div class="quoted-original-body">${(m.body || '(no content)').replace(/</g, '&lt;')}</div>
+        </div>
         <div class="attach-chips" id="reply-attach-chips"></div>
         <p class="muted" id="reply-status"></p>
         <div class="inline-reply-actions">
@@ -1261,12 +1268,15 @@
 
   function sendInlineReply(i) {
     const m = currentMailMessages[i];
-    const body = document.getElementById('reply-body').value;
+    const replyText = document.getElementById('reply-body').value;
     const status = document.getElementById('reply-status');
-    if (!body.trim()) {
+    if (!replyText.trim()) {
       status.textContent = 'Message cannot be empty.';
       return;
     }
+    const quoted = `\n\n---\nOn ${fmtMailDate(m.date)}, ${m.from} wrote:\n` +
+      (m.body || '').split('\n').map((l) => '> ' + l).join('\n');
+    const body = replyText + quoted;
     status.textContent = 'Sending…';
     fetch('/api/admin/mailbox/send?' + authQS(), {
       method: 'POST',
