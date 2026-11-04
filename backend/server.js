@@ -112,12 +112,52 @@ async function fetchMailbox(folder, limit) {
   return messages.reverse();
 }
 
+// --- Admin users (named logins) ---
+const USERS_JSON = '/opt/lifestyle-ceramics/backend/users.json';
+function loadUsers() {
+  if (!fs.existsSync(USERS_JSON)) {
+    const seeded = [{ username: 'admin', password: ADMIN_PASSWORD, role: 'admin' }];
+    fs.writeFileSync(USERS_JSON, JSON.stringify(seeded, null, 2));
+    return seeded;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(USERS_JSON, 'utf8'));
+  } catch {
+    return [{ username: 'admin', password: ADMIN_PASSWORD, role: 'admin' }];
+  }
+}
+function saveUsers(users) {
+  fs.writeFileSync(USERS_JSON, JSON.stringify(users, null, 2));
+}
+
+// Accepts either {username, password} (named login) or just {password}
+// (legacy/back-compat — matches against any user's password so existing
+// bookmarked links and the original shared-password flow keep working).
 function requireAdmin(req, res, next) {
   const pw = req.query.password || req.headers['x-admin-password'];
-  if (pw !== ADMIN_PASSWORD) {
+  const username = req.query.username || req.headers['x-admin-username'];
+  const users = loadUsers();
+
+  let matched = null;
+  if (username) {
+    matched = users.find((u) => u.username === username && u.password === pw);
+  } else {
+    matched = users.find((u) => u.password === pw);
+  }
+
+  if (!matched) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
+  req.adminUser = matched.username;
   next();
+}
+
+// --- Activity log (audit trail) ---
+const ACTIVITY_LOG = '/opt/lifestyle-ceramics/backend/activity.log';
+function logActivity(user, action, details) {
+  fs.appendFile(ACTIVITY_LOG, JSON.stringify({
+    user: user || 'admin', action, details: details || '', date: new Date().toISOString(),
+  }) + '\n', () => {});
 }
 
 function readJsonLines(filePath) {
@@ -330,6 +370,7 @@ app.put('/admin/quotes/:quoteNumber/stage', requireAdmin, (req, res) => {
   }
   const updated = appendQuoteUpdate(req.params.quoteNumber, { stage, [`${stage}At`]: new Date().toISOString() });
   if (!updated) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+  logActivity(req.adminUser, 'moved_quote_stage', `${req.params.quoteNumber} -> ${stage}`);
   res.json({ ok: true, quote: updated });
 });
 
@@ -363,6 +404,7 @@ app.post('/admin/send-quote', requireAdmin, async (req, res) => {
     // quoteNumber last, so this marks it sent without rewriting the log.
     appendQuoteUpdate(quoteNumber, { status: 'sent', stage: 'quote_sent', sentAt: new Date().toISOString() });
 
+    logActivity(req.adminUser, 'sent_quote', quoteNumber);
     res.json({ ok: true });
   } catch (err) {
     console.error('Send-quote error:', err);
@@ -501,6 +543,7 @@ app.post('/admin/products', requireAdmin, (req, res) => {
   const product = { ...req.body, id: nextId };
   products.push(product);
   saveProducts(products);
+  logActivity(req.adminUser, 'created_product', product.name);
   res.json({ ok: true, product });
 });
 
@@ -511,13 +554,16 @@ app.put('/admin/products/:id', requireAdmin, (req, res) => {
   if (idx === -1) return res.status(404).json({ ok: false, error: 'Product not found.' });
   products[idx] = { ...products[idx], ...req.body, id };
   saveProducts(products);
+  logActivity(req.adminUser, 'updated_product', products[idx].name);
   res.json({ ok: true, product: products[idx] });
 });
 
 app.delete('/admin/products/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
-  const products = loadProducts().filter((p) => p.id !== id);
-  saveProducts(products);
+  const products = loadProducts();
+  const removed = products.find((p) => p.id === id);
+  saveProducts(products.filter((p) => p.id !== id));
+  logActivity(req.adminUser, 'deleted_product', removed ? removed.name : String(id));
   res.json({ ok: true });
 });
 
@@ -551,6 +597,7 @@ app.post('/admin/products/:id/adjust-stock', requireAdmin, (req, res) => {
     date: new Date().toISOString(),
   }) + '\n', () => {});
 
+  logActivity(req.adminUser, 'adjusted_stock', `${products[idx].name}: ${prevQty} -> ${newQty}`);
   res.json({ ok: true, product: products[idx] });
 });
 
@@ -577,7 +624,41 @@ app.get('/admin/settings', requireAdmin, (req, res) => {
 app.put('/admin/settings', requireAdmin, (req, res) => {
   const settings = { ...loadSettings(), ...req.body };
   saveSettings(settings);
+  logActivity(req.adminUser, 'updated_settings');
   res.json({ ok: true, settings });
+});
+
+// --- Admin users (named logins) ---
+app.get('/admin/users', requireAdmin, (req, res) => {
+  res.json({ ok: true, users: loadUsers().map((u) => ({ username: u.username, role: u.role })) });
+});
+
+app.post('/admin/users', requireAdmin, (req, res) => {
+  const { username, password, role } = req.body || {};
+  if (!username || !password) return res.status(400).json({ ok: false, error: 'Missing username or password.' });
+  const users = loadUsers();
+  if (users.some((u) => u.username === username)) {
+    return res.status(400).json({ ok: false, error: 'Username already exists.' });
+  }
+  users.push({ username, password, role: role || 'admin' });
+  saveUsers(users);
+  logActivity(req.adminUser, 'added_user', username);
+  res.json({ ok: true });
+});
+
+app.delete('/admin/users/:username', requireAdmin, (req, res) => {
+  const users = loadUsers();
+  if (users.length <= 1) return res.status(400).json({ ok: false, error: 'Cannot delete the last remaining user.' });
+  const filtered = users.filter((u) => u.username !== req.params.username);
+  saveUsers(filtered);
+  logActivity(req.adminUser, 'removed_user', req.params.username);
+  res.json({ ok: true });
+});
+
+// --- Activity log (audit trail) ---
+app.get('/admin/activity', requireAdmin, (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  res.json({ ok: true, activity: readJsonLines(ACTIVITY_LOG).reverse().slice(0, limit) });
 });
 
 // --- Client tracker (CRM) ---
@@ -766,6 +847,7 @@ app.post('/admin/documents/invoice', requireAdmin, async (req, res) => {
       date: new Date().toISOString(), status: 'issued', pdfPath: filePath,
     };
     fs.appendFile(DOCUMENTS_LOG, JSON.stringify(entry) + '\n', () => {});
+    logActivity(req.adminUser, 'generated_invoice', `${docNumber} (from ${quoteNumber})`);
     res.json({ ok: true, docNumber });
   } catch (err) {
     console.error('Invoice generation error:', err);
@@ -811,6 +893,7 @@ app.post('/admin/documents/receipt', requireAdmin, async (req, res) => {
       appendQuoteUpdate(invoice.refNumber, { stage: 'paid', paidAt: new Date().toISOString() });
     }
 
+    logActivity(req.adminUser, 'generated_receipt', `${docNumber} (${formatZAR(Number(amountPaid))} for ${invoiceNumber})`);
     res.json({ ok: true, docNumber });
   } catch (err) {
     console.error('Receipt generation error:', err);
@@ -822,6 +905,70 @@ app.get('/admin/documents', requireAdmin, (req, res) => {
   const byNumber = new Map();
   readJsonLines(DOCUMENTS_LOG).forEach((d) => byNumber.set(d.docNumber, d));
   res.json({ ok: true, documents: [...byNumber.values()].reverse() });
+});
+
+// Invoices sent more than N days ago with no receipt issued against them yet.
+app.get('/admin/documents/overdue', requireAdmin, (req, res) => {
+  const days = Number(req.query.days) || 7;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+
+  const byNumber = new Map();
+  readJsonLines(DOCUMENTS_LOG).forEach((d) => byNumber.set(d.docNumber, d));
+  const docs = [...byNumber.values()];
+
+  const invoicesWithReceipts = new Set(
+    docs.filter((d) => d.type === 'receipt').map((d) => d.refNumber)
+  );
+
+  const overdue = docs.filter((d) =>
+    d.type === 'invoice' &&
+    d.status === 'sent' &&
+    !invoicesWithReceipts.has(d.docNumber) &&
+    new Date(d.sentAt || d.date).getTime() < cutoff
+  ).map((d) => ({
+    ...d,
+    daysOverdue: Math.floor((Date.now() - new Date(d.sentAt || d.date).getTime()) / (24 * 60 * 60 * 1000)),
+  }));
+
+  res.json({ ok: true, overdue, thresholdDays: days });
+});
+
+// Monthly quoted vs invoiced vs paid totals, for the revenue trend chart.
+app.get('/admin/revenue-summary', requireAdmin, (req, res) => {
+  const months = Number(req.query.months) || 6;
+  const quotesByNumber = new Map();
+  readJsonLines(LOG_PATH).forEach((q) => quotesByNumber.set(q.quoteNumber, q));
+  const quotes = [...quotesByNumber.values()];
+
+  const docsByNumber = new Map();
+  readJsonLines(DOCUMENTS_LOG).forEach((d) => docsByNumber.set(d.docNumber, d));
+  const docs = [...docsByNumber.values()];
+
+  function monthKey(iso) {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  const now = new Date();
+  const buckets = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' }), quoted: 0, invoiced: 0, paid: 0 });
+  }
+  const byKey = new Map(buckets.map((b) => [b.key, b]));
+
+  quotes.forEach((q) => {
+    const b = byKey.get(monthKey(q.date));
+    if (b) b.quoted += Number(q.grandTotal) || 0;
+  });
+  docs.forEach((d) => {
+    const b = byKey.get(monthKey(d.date));
+    if (!b) return;
+    if (d.type === 'invoice') b.invoiced += Number(d.total) || 0;
+    if (d.type === 'receipt') b.paid += Number(d.total) || 0;
+  });
+
+  res.json({ ok: true, months: buckets });
 });
 
 app.get('/admin/documents/:docNumber/download', requireAdmin, (req, res) => {
@@ -853,6 +1000,7 @@ app.post('/admin/documents/:docNumber/send', requireAdmin, async (req, res) => {
       appendQuoteUpdate(doc.refNumber, { stage: 'invoice_sent', invoice_sentAt: new Date().toISOString() });
     }
 
+    logActivity(req.adminUser, 'sent_document', `${doc.docNumber} (${doc.type}) to ${doc.email}`);
     res.json({ ok: true });
   } catch (err) {
     console.error('Document send error:', err);

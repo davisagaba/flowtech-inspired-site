@@ -115,6 +115,8 @@
       <button class="panel-tab" id="ptab-clients" onclick="switchPanel('clients')">Clients</button>
       <button class="panel-tab" id="ptab-documents" onclick="switchPanel('documents')">Documents</button>
       <button class="panel-tab" id="ptab-visitors" onclick="switchPanel('visitors')">Visitors</button>
+      <button class="panel-tab" id="ptab-activity" onclick="switchPanel('activity')">Activity Log</button>
+      <button class="panel-tab" id="ptab-users" onclick="switchPanel('users')">Users</button>
       <button class="panel-tab" id="ptab-settings" onclick="switchPanel('settings')">Settings</button>
     </div>
 
@@ -122,6 +124,17 @@
       <section>
         <h2 style="font-size:16px;">Overview</h2>
         <div class="cards" id="summary-cards"></div>
+      </section>
+      <section id="overdue-section" style="display:none;">
+        <h2 style="font-size:16px;">Overdue Invoices</h2>
+        <table id="overdue-table">
+          <thead><tr><th>Invoice #</th><th>Client</th><th>Total</th><th>Sent</th><th>Days Overdue</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section>
+        <h2 style="font-size:16px;">Revenue — Quoted vs Invoiced vs Paid (last 6 months)</h2>
+        <div id="revenue-chart" style="background:#fff;border-radius:14px;padding:20px;"></div>
       </section>
     </div>
 
@@ -228,6 +241,32 @@
       </section>
     </div>
 
+    <div class="panel" id="panel-activity">
+      <section>
+        <div class="section-head">
+          <h2 style="font-size:16px;margin:0;">Activity Log</h2>
+          <button class="btn-outline-sm" onclick="loadActivity()">Refresh</button>
+        </div>
+        <table id="activity-table">
+          <thead><tr><th>Date</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+
+    <div class="panel" id="panel-users">
+      <section>
+        <div class="section-head">
+          <h2 style="font-size:16px;margin:0;">Admin Users</h2>
+          <button class="btn" onclick="openUserForm()">+ Add User</button>
+        </div>
+        <table id="users-table">
+          <thead><tr><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+
     <div class="panel" id="panel-settings">
       <section>
         <h2 style="font-size:16px;">Document Template Settings</h2>
@@ -286,6 +325,25 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeReceiptModal()">Cancel</button>
       <button class="btn" onclick="submitReceipt()">Generate Receipt</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <h3>Add Admin User</h3>
+    <div class="form-row">
+      <label>Username</label>
+      <input type="text" id="u-username" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>Password</label>
+      <input type="text" id="u-password" autocomplete="off">
+    </div>
+    <p class="muted" id="user-status"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeUserForm()">Cancel</button>
+      <button class="btn" onclick="saveUser()">Add User</button>
     </div>
   </div>
 </div>
@@ -437,6 +495,7 @@
         render(data);
         loadProducts();
         loadMail(currentMailFolder);
+        loadOverviewExtras();
       })
       .catch(() => {
         document.getElementById('login-error').textContent = 'Incorrect password.';
@@ -626,6 +685,7 @@
             ? '<span class="muted">Sent</span>'
             : `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendQuote('${q.quoteNumber}', this)">Send to Client</button>`}
           <button class="btn-outline-sm" onclick="generateInvoice('${q.quoteNumber}', this)">Generate Invoice</button>
+          ${q.phone ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;background:#25d366;color:#fff;border-color:#25d366;" href="${whatsappQuoteLink(q.phone, q.quoteNumber, q.name)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
         </td>
       </tr>`).join('') || '<tr><td colspan="9" class="muted">No quote requests yet</td></tr>';
 
@@ -660,7 +720,7 @@
   }
 
   // ---------- Panel tabs ----------
-  const PANEL_NAMES = ['overview', 'email', 'products', 'stock', 'quotes', 'clients', 'documents', 'visitors', 'settings'];
+  const PANEL_NAMES = ['overview', 'email', 'products', 'stock', 'quotes', 'clients', 'documents', 'visitors', 'activity', 'users', 'settings'];
   function switchPanel(name) {
     PANEL_NAMES.forEach((p) => {
       document.getElementById('panel-' + p).classList.toggle('active', p === name);
@@ -670,6 +730,9 @@
     if (name === 'clients') loadClients();
     if (name === 'documents') loadDocuments();
     if (name === 'settings') loadSettingsForm();
+    if (name === 'overview') loadOverviewExtras();
+    if (name === 'activity') loadActivity();
+    if (name === 'users') loadUsersTab();
   }
 
   // ---------- Unibox: real Inbox/Outbox pulled live via IMAP ----------
@@ -1207,6 +1270,150 @@
       .then((data) => {
         document.getElementById('settings-status').textContent = data.ok ? 'Saved — applies to new documents going forward.' : 'Error saving.';
       });
+  }
+
+  // ---------- Overview: overdue invoices + revenue chart ----------
+  function loadOverviewExtras() {
+    loadOverdue();
+    loadRevenueChart();
+  }
+
+  function loadOverdue() {
+    fetch('/api/admin/documents/overdue?password=' + encodeURIComponent(adminPw()) + '&days=7', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        const section = document.getElementById('overdue-section');
+        const overdue = data.overdue || [];
+        if (overdue.length === 0) {
+          section.style.display = 'none';
+          return;
+        }
+        section.style.display = 'block';
+        document.querySelector('#overdue-table tbody').innerHTML = overdue.map((d) => `
+          <tr>
+            <td>${d.docNumber}</td>
+            <td>${d.name || ''}<br><span class="muted">${d.email || ''}</span></td>
+            <td>${fmtZAR(d.total)}</td>
+            <td>${new Date(d.sentAt || d.date).toLocaleDateString('en-ZA')}</td>
+            <td style="color:#c0392b;font-weight:700;">${d.daysOverdue} days</td>
+            <td><button class="btn-outline-sm" onclick="openReceiptModal('${d.docNumber}')">Record Payment</button></td>
+          </tr>
+        `).join('');
+      });
+  }
+
+  function loadRevenueChart() {
+    fetch('/api/admin/revenue-summary?password=' + encodeURIComponent(adminPw()) + '&months=6', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        const months = data.months || [];
+        const max = Math.max(1, ...months.flatMap((m) => [m.quoted, m.invoiced, m.paid]));
+        const chartW = 600, chartH = 220, groupW = chartW / months.length, barW = Math.min(22, groupW / 5);
+
+        const bars = months.map((m, i) => {
+          const groupX = i * groupW + groupW / 2;
+          const series = [
+            { val: m.quoted, color: '#b8cfd0', dx: -barW * 1.1 },
+            { val: m.invoiced, color: '#5b9598', dx: 0 },
+            { val: m.paid, color: '#0d5559', dx: barW * 1.1 },
+          ];
+          const barsHtml = series.map((s) => {
+            const h = (s.val / max) * (chartH - 40);
+            return `<rect x="${groupX + s.dx - barW / 2}" y="${chartH - 30 - h}" width="${barW}" height="${h}" fill="${s.color}" rx="2"></rect>`;
+          }).join('');
+          const label = `<text x="${groupX}" y="${chartH - 10}" font-size="11" fill="#6b7074" text-anchor="middle">${m.label}</text>`;
+          return barsHtml + label;
+        }).join('');
+
+        document.getElementById('revenue-chart').innerHTML = `
+          <svg viewBox="0 0 ${chartW} ${chartH}" style="width:100%;height:auto;display:block;">${bars}</svg>
+          <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;">
+            <span><span style="display:inline-block;width:10px;height:10px;background:#b8cfd0;border-radius:2px;margin-right:4px;"></span>Quoted</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#5b9598;border-radius:2px;margin-right:4px;"></span>Invoiced</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#0d5559;border-radius:2px;margin-right:4px;"></span>Paid</span>
+          </div>
+        `;
+      });
+  }
+
+  // ---------- WhatsApp quick-send ----------
+  function whatsappQuoteLink(phone, quoteNumber, name) {
+    const digits = String(phone || '').replace(/[^0-9]/g, '');
+    const message = `Hi ${name || ''}, this is Life Style Ceramics regarding your quote ${quoteNumber}. `;
+    return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+  }
+
+  // ---------- Activity log ----------
+  function loadActivity() {
+    fetch('/api/admin/activity?password=' + encodeURIComponent(adminPw()) + '&limit=150', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        document.querySelector('#activity-table tbody').innerHTML = (data.activity || []).map((a) => `
+          <tr>
+            <td>${new Date(a.date).toLocaleString('en-ZA')}</td>
+            <td>${a.user}</td>
+            <td style="text-transform:capitalize;">${a.action.replace(/_/g, ' ')}</td>
+            <td>${a.details || ''}</td>
+          </tr>
+        `).join('') || '<tr><td colspan="4" class="muted">No activity yet</td></tr>';
+      });
+  }
+
+  // ---------- Admin users ----------
+  function loadUsersTab() {
+    fetch('/api/admin/users?password=' + encodeURIComponent(adminPw()), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        document.querySelector('#users-table tbody').innerHTML = (data.users || []).map((u) => `
+          <tr>
+            <td>${u.username}</td>
+            <td>${u.role}</td>
+            <td>${data.users.length > 1 ? `<button class="btn-danger-sm" onclick="deleteUser('${u.username}')">Remove</button>` : '<span class="muted">Last user</span>'}</td>
+          </tr>
+        `).join('');
+      });
+  }
+
+  function openUserForm() {
+    document.getElementById('u-username').value = '';
+    document.getElementById('u-password').value = '';
+    document.getElementById('user-status').textContent = '';
+    document.getElementById('user-modal').classList.add('open');
+  }
+  function closeUserForm() {
+    document.getElementById('user-modal').classList.remove('open');
+  }
+  function saveUser() {
+    const username = document.getElementById('u-username').value.trim();
+    const password = document.getElementById('u-password').value;
+    if (!username || !password) {
+      document.getElementById('user-status').textContent = 'Username and password are required.';
+      return;
+    }
+    fetch('/api/admin/users?password=' + encodeURIComponent(adminPw()), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        closeUserForm();
+        loadUsersTab();
+      })
+      .catch((err) => {
+        document.getElementById('user-status').textContent = 'Error: ' + err.message;
+      });
+  }
+  function deleteUser(username) {
+    if (!confirm('Remove user "' + username + '"?')) return;
+    fetch('/api/admin/users/' + encodeURIComponent(username) + '?password=' + encodeURIComponent(adminPw()), { method: 'DELETE' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        loadUsersTab();
+      })
+      .catch((err) => alert('Could not remove user: ' + err.message));
   }
 
   // Auto-login if password already stored in this session
