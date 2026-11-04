@@ -194,7 +194,8 @@
 <div id="login-box">
   <h1>Admin Login</h1>
   <p class="muted" style="margin-bottom:16px;">Life Style Ceramics dashboard</p>
-  <input type="password" id="pw-input" placeholder="Admin password">
+  <input type="text" id="user-input" placeholder="Username" autocomplete="username">
+  <input type="password" id="pw-input" placeholder="Password" autocomplete="current-password">
   <button onclick="login()" style="width:100%;">Sign In</button>
   <p class="muted" id="login-error" style="margin-top:10px;color:#c0392b;"></p>
 </div>
@@ -231,7 +232,7 @@
         <button class="nav-item" id="ptab-users" onclick="switchPanel('users')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span>Users</span></button>
         <button class="nav-item" id="ptab-settings" onclick="switchPanel('settings')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>Settings</span></button>
       </nav>
-      <button class="sidebar-logout" onclick="sessionStorage.removeItem('lsc_admin_pw'); location.reload();">
+      <button class="sidebar-logout" onclick="sessionStorage.removeItem('lsc_admin_pw'); sessionStorage.removeItem('lsc_admin_user'); location.reload();">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         <span>Log Out</span>
       </button>
@@ -591,7 +592,7 @@
 
   function setQuoteStage(quoteNumber, stage) {
     if (!stage) return;
-    fetch('/api/admin/quotes/' + quoteNumber + '/stage?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/quotes/' + quoteNumber + '/stage?' + authQS(), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stage }),
@@ -617,11 +618,14 @@
   }
 
   function login() {
+    const user = document.getElementById('user-input').value.trim();
     const pw = document.getElementById('pw-input').value;
-    fetch('/api/analytics?password=' + encodeURIComponent(pw))
+    const qs = 'password=' + encodeURIComponent(pw) + (user ? '&username=' + encodeURIComponent(user) : '');
+    fetch('/api/analytics?' + qs)
       .then((r) => { if (!r.ok) throw new Error('bad'); return r.json(); })
       .then((data) => {
         sessionStorage.setItem('lsc_admin_pw', pw);
+        sessionStorage.setItem('lsc_admin_user', user);
         document.getElementById('login-box').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         render(data);
@@ -630,12 +634,12 @@
         loadOverviewExtras();
       })
       .catch(() => {
-        document.getElementById('login-error').textContent = 'Incorrect password.';
+        document.getElementById('login-error').textContent = 'Incorrect username or password.';
       });
   }
 
   function refreshAnalytics() {
-    fetch('/api/analytics?password=' + encodeURIComponent(adminPw()), { cache: 'no-store' })
+    fetch('/api/analytics?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => { if (data.ok) render(data); });
   }
@@ -647,9 +651,16 @@
   function adminPw() {
     return sessionStorage.getItem('lsc_admin_pw');
   }
+  function adminUsername() {
+    return sessionStorage.getItem('lsc_admin_user') || '';
+  }
+  function authQS() {
+    const u = adminUsername();
+    return 'password=' + encodeURIComponent(adminPw()) + (u ? '&username=' + encodeURIComponent(u) : '');
+  }
 
   function loadProducts() {
-    fetch('/api/admin/products?password=' + encodeURIComponent(adminPw()))
+    fetch('/api/admin/products?' + authQS())
       .then((r) => r.json())
       .then((data) => {
         currentProducts = data.products || [];
@@ -700,7 +711,7 @@
     status.textContent = 'Uploading...';
     const formData = new FormData();
     formData.append('image', file);
-    fetch('/api/admin/upload-image?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/upload-image?' + authQS(), {
       method: 'POST',
       body: formData,
     })
@@ -756,8 +767,8 @@
     if (!payload.name) { alert('Product name is required.'); return; }
 
     const url = id
-      ? '/api/admin/products/' + id + '?password=' + encodeURIComponent(adminPw())
-      : '/api/admin/products?password=' + encodeURIComponent(adminPw());
+      ? '/api/admin/products/' + id + '?' + authQS()
+      : '/api/admin/products?' + authQS();
     fetch(url, {
       method: id ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -774,7 +785,7 @@
 
   function deleteProduct(id) {
     if (!confirm('Delete this product? This cannot be undone.')) return;
-    fetch('/api/admin/products/' + id + '?password=' + encodeURIComponent(adminPw()), { method: 'DELETE' })
+    fetch('/api/admin/products/' + id + '?' + authQS(), { method: 'DELETE' })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Delete failed');
@@ -831,10 +842,9 @@
   }
 
   function sendQuote(quoteNumber, btn) {
-    const pw = sessionStorage.getItem('lsc_admin_pw');
     btn.disabled = true;
     btn.textContent = 'Sending...';
-    fetch('/api/admin/send-quote?password=' + encodeURIComponent(pw), {
+    fetch('/api/admin/send-quote?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ quoteNumber }),
@@ -910,7 +920,7 @@
   function loadMail(folder) {
     const list = document.getElementById('mail-list');
     list.innerHTML = '<div class="mail-empty">Loading…</div>';
-    fetch('/api/admin/mailbox/' + folder + '?password=' + encodeURIComponent(adminPw()) + '&limit=30', { cache: 'no-store' })
+    fetch('/api/admin/mailbox/' + folder + '?' + authQS() + '&limit=30', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Failed to load mailbox');
@@ -967,7 +977,7 @@
     `;
 
     if (currentMailFolder === 'inbox' && !m.seen) {
-      fetch('/api/admin/mailbox/mark-read?password=' + encodeURIComponent(adminPw()), {
+      fetch('/api/admin/mailbox/mark-read?' + authQS(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ folder: 'INBOX', uid: m.uid }),
@@ -1033,7 +1043,7 @@
     status.textContent = 'Uploading ' + file.name + '…';
     const formData = new FormData();
     formData.append('file', file);
-    fetch('/api/admin/mailbox/upload-attachment?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/mailbox/upload-attachment?' + authQS(), {
       method: 'POST',
       body: formData,
     })
@@ -1070,7 +1080,7 @@
       return;
     }
     status.textContent = 'Sending…';
-    fetch('/api/admin/mailbox/send?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/mailbox/send?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1133,7 +1143,7 @@
     }
     const status = document.getElementById('compose-status');
     status.textContent = 'Sending…';
-    fetch('/api/admin/mailbox/send?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/mailbox/send?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to, subject, body, inReplyTo }),
@@ -1153,9 +1163,9 @@
   // ---------- Stock control ----------
   function loadStock() {
     Promise.all([
-      fetch('/api/admin/stock/summary?password=' + encodeURIComponent(adminPw())).then((r) => r.json()),
-      fetch('/api/admin/products?password=' + encodeURIComponent(adminPw())).then((r) => r.json()),
-      fetch('/api/admin/stock/history?password=' + encodeURIComponent(adminPw()) + '&limit=30').then((r) => r.json()),
+      fetch('/api/admin/stock/summary?' + authQS()).then((r) => r.json()),
+      fetch('/api/admin/products?' + authQS()).then((r) => r.json()),
+      fetch('/api/admin/stock/history?' + authQS() + '&limit=30').then((r) => r.json()),
     ]).then(([summary, productsRes, historyRes]) => {
       document.getElementById('stock-summary-cards').innerHTML = `
         <div class="card"><div class="num">${summary.outOfStock.length}</div><div class="label">Out of stock</div></div>
@@ -1197,7 +1207,7 @@
   }
 
   function adjustStock(id, delta, reason) {
-    fetch('/api/admin/products/' + id + '/adjust-stock?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/products/' + id + '/adjust-stock?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ delta, reason: reason || (delta > 0 ? 'Manual increase' : 'Manual decrease') }),
@@ -1214,7 +1224,7 @@
     const value = prompt('Set new stock quantity (whole number):');
     if (value === null) return;
     const newQty = Math.max(0, Number(value) || 0);
-    fetch('/api/admin/products?password=' + encodeURIComponent(adminPw()))
+    fetch('/api/admin/products?' + authQS())
       .then((r) => r.json())
       .then((data) => {
         const p = (data.products || []).find((x) => x.id === id);
@@ -1228,7 +1238,7 @@
   function loadClients() {
     const list = document.getElementById('clients-list');
     list.innerHTML = '<div class="mail-empty">Loading…</div>';
-    fetch('/api/admin/clients?password=' + encodeURIComponent(adminPw()), { cache: 'no-store' })
+    fetch('/api/admin/clients?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         currentClients = data.clients || [];
@@ -1274,7 +1284,7 @@
 
   function saveClientNotes(email) {
     const notes = document.getElementById('client-notes').value;
-    fetch('/api/admin/clients/' + encodeURIComponent(email) + '/notes?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/clients/' + encodeURIComponent(email) + '/notes?' + authQS(), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ notes }),
@@ -1287,7 +1297,7 @@
 
   // ---------- Documents (Invoices & Receipts) ----------
   function loadDocuments() {
-    fetch('/api/admin/documents?password=' + encodeURIComponent(adminPw()), { cache: 'no-store' })
+    fetch('/api/admin/documents?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         const docs = data.documents || [];
@@ -1301,7 +1311,7 @@
             <td><span class="pill ${d.status === 'sent' ? 'done' : ''}">${d.status}</span></td>
             <td>${new Date(d.date).toLocaleDateString('en-ZA')}</td>
             <td>
-              <a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/documents/${d.docNumber}/download?password=${encodeURIComponent(adminPw())}" target="_blank">Download</a>
+              <a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/documents/${d.docNumber}/download?${authQS()}" target="_blank">Download</a>
               ${d.status !== 'sent' ? `<button class="btn-outline-sm" onclick="sendDocument('${d.docNumber}', this)">Send</button>` : ''}
               ${d.type === 'invoice' ? `<button class="btn-outline-sm" onclick="openReceiptModal('${d.docNumber}')">Receipt</button>` : ''}
             </td>
@@ -1313,7 +1323,7 @@
   function sendDocument(docNumber, btn) {
     btn.disabled = true;
     btn.textContent = 'Sending...';
-    fetch('/api/admin/documents/' + docNumber + '/send?password=' + encodeURIComponent(adminPw()), { method: 'POST' })
+    fetch('/api/admin/documents/' + docNumber + '/send?' + authQS(), { method: 'POST' })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Send failed');
@@ -1330,7 +1340,7 @@
   function generateInvoice(quoteNumber, btn) {
     btn.disabled = true;
     btn.textContent = 'Generating...';
-    fetch('/api/admin/documents/invoice?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/documents/invoice?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ quoteNumber }),
@@ -1365,7 +1375,7 @@
       document.getElementById('receipt-status').textContent = 'Enter an amount.';
       return;
     }
-    fetch('/api/admin/documents/receipt?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/documents/receipt?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ invoiceNumber, amountPaid, paymentMethod }),
@@ -1384,7 +1394,7 @@
 
   // ---------- Settings (document template) ----------
   function loadSettingsForm() {
-    fetch('/api/admin/settings?password=' + encodeURIComponent(adminPw()))
+    fetch('/api/admin/settings?' + authQS())
       .then((r) => r.json())
       .then((data) => {
         const s = data.settings || {};
@@ -1406,7 +1416,7 @@
       bankDetails: document.getElementById('s-bankDetails').value,
       footerTerms: document.getElementById('s-footerTerms').value,
     };
-    fetch('/api/admin/settings?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/settings?' + authQS(), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1424,7 +1434,7 @@
   }
 
   function loadOverdue() {
-    fetch('/api/admin/documents/overdue?password=' + encodeURIComponent(adminPw()) + '&days=7', { cache: 'no-store' })
+    fetch('/api/admin/documents/overdue?' + authQS() + '&days=7', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         const section = document.getElementById('overdue-section');
@@ -1448,7 +1458,7 @@
   }
 
   function loadRevenueChart() {
-    fetch('/api/admin/revenue-summary?password=' + encodeURIComponent(adminPw()) + '&months=6', { cache: 'no-store' })
+    fetch('/api/admin/revenue-summary?' + authQS() + '&months=6', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         const months = data.months || [];
@@ -1490,7 +1500,7 @@
 
   // ---------- Activity log ----------
   function loadActivity() {
-    fetch('/api/admin/activity?password=' + encodeURIComponent(adminPw()) + '&limit=150', { cache: 'no-store' })
+    fetch('/api/admin/activity?' + authQS() + '&limit=150', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         document.querySelector('#activity-table tbody').innerHTML = (data.activity || []).map((a) => `
@@ -1506,7 +1516,7 @@
 
   // ---------- Admin users ----------
   function loadUsersTab() {
-    fetch('/api/admin/users?password=' + encodeURIComponent(adminPw()), { cache: 'no-store' })
+    fetch('/api/admin/users?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         document.querySelector('#users-table tbody').innerHTML = (data.users || []).map((u) => `
@@ -1535,7 +1545,7 @@
       document.getElementById('user-status').textContent = 'Username and password are required.';
       return;
     }
-    fetch('/api/admin/users?password=' + encodeURIComponent(adminPw()), {
+    fetch('/api/admin/users?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -1552,7 +1562,7 @@
   }
   function deleteUser(username) {
     if (!confirm('Remove user "' + username + '"?')) return;
-    fetch('/api/admin/users/' + encodeURIComponent(username) + '?password=' + encodeURIComponent(adminPw()), { method: 'DELETE' })
+    fetch('/api/admin/users/' + encodeURIComponent(username) + '?' + authQS(), { method: 'DELETE' })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Failed');
@@ -1565,6 +1575,7 @@
   const stored = sessionStorage.getItem('lsc_admin_pw');
   if (stored) {
     document.getElementById('pw-input').value = stored;
+    document.getElementById('user-input').value = sessionStorage.getItem('lsc_admin_user') || '';
     login();
   }
 </script>
