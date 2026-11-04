@@ -223,6 +223,24 @@
         availability: product.stock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
         itemCondition: 'https://schema.org/NewCondition',
         areaServed: 'ZA',
+        shippingDetails: {
+          '@type': 'OfferShippingDetails',
+          shippingRate: { '@type': 'MonetaryAmount', value: '0', currency: 'ZAR' },
+          shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'ZA' },
+          deliveryTime: {
+            '@type': 'ShippingDeliveryTime',
+            handlingTime: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 2, unitCode: 'DAY' },
+            transitTime: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 7, unitCode: 'DAY' },
+          },
+        },
+        hasMerchantReturnPolicy: {
+          '@type': 'MerchantReturnPolicy',
+          applicableCountry: 'ZA',
+          returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+          merchantReturnDays: 30,
+          returnMethod: 'https://schema.org/ReturnByMail',
+          returnFees: 'https://schema.org/FreeReturn',
+        },
       },
     };
     document.getElementById('product-schema').textContent = JSON.stringify(productSchema);
