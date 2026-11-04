@@ -7,88 +7,186 @@
 <meta name="robots" content="noindex, nofollow">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --navy: #0a1420;
+    --navy-light: #10202f;
+    --teal: #0d5559;
+    --teal-light: #12767c;
+    --accent: #2dd4bf;
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --border: #e7e9ec;
+    --text: #15181a;
+    --text-muted: #6b7074;
+    --text-faint: #9a9d9f;
+    --danger: #e34b4b;
+    --warn: #c8860d;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --shadow-sm: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+    --shadow-md: 0 4px 10px rgba(16,24,40,.06), 0 2px 4px rgba(16,24,40,.04);
+    --shadow-lg: 0 12px 32px rgba(16,24,40,.10), 0 4px 10px rgba(16,24,40,.06);
+  }
   * { box-sizing: border-box; }
-  body { font-family: 'Poppins', Arial, sans-serif; background: #f3f4f2; margin: 0; padding: 24px; color: #15181a; }
-  .wrap { max-width: 1000px; margin: 0 auto; }
-  h1 { font-size: 22px; margin-bottom: 4px; }
-  .muted { color: #6b7074; font-size: 13px; }
-  #login-box { max-width: 320px; margin: 80px auto; background: #fff; padding: 32px; border-radius: 16px; }
-  #login-box input { width: 100%; padding: 10px 12px; border: 1px solid #e2e4e1; border-radius: 10px; margin-bottom: 12px; font-family: inherit; }
-  #login-box button, .btn { background: #0d5559; color: #fff; border: none; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: inherit; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
-  .card { background: #fff; border-radius: 14px; padding: 16px 20px; }
-  .card .num { font-size: 26px; font-weight: 800; color: #0d5559; }
-  .card .label { font-size: 12px; color: #6b7074; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 14px; overflow: hidden; margin-bottom: 24px; }
-  th, td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid #eee; }
-  th { background: #f8f8f7; font-weight: 700; }
-  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fde9a8; color: #7a5b00; }
-  .pill.done { background: #d6f0e0; color: #0d5559; }
-  .stage-stepper { display: flex; align-items: center; flex-wrap: wrap; gap: 0; font-size: 11px; }
-  .stage-step { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 999px; color: #9a9d9f; background: #f3f4f2; white-space: nowrap; }
-  .stage-step.done { color: #0d5559; background: #d6f0e0; font-weight: 700; }
-  .stage-step.current { color: #fff; background: #0d5559; font-weight: 700; }
-  .stage-arrow { color: #ccc; margin: 0 2px; font-size: 10px; }
-  .stage-select { margin-top: 6px; padding: 5px 8px; border: 1px solid #e2e4e1; border-radius: 8px; font-family: inherit; font-size: 12px; }
-  section { margin-bottom: 32px; }
+  body { font-family: 'Poppins', Arial, sans-serif; background: var(--bg); margin: 0; color: var(--text); -webkit-font-smoothing: antialiased; }
+  h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+  .muted { color: var(--text-muted); font-size: 13px; }
+
+  /* ---------- Login ---------- */
+  #login-box { max-width: 360px; margin: 10vh auto; background: var(--surface); padding: 40px 36px; border-radius: 20px; box-shadow: var(--shadow-lg); border: 1px solid var(--border); }
+  #login-box h1 { font-size: 22px; }
+  #login-box input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 12px; font-family: inherit; font-size: 14px; transition: border-color .15s; }
+  #login-box input:focus { outline: none; border-color: var(--teal); }
+  #login-box button, .btn { background: linear-gradient(180deg, var(--teal-light), var(--teal)); color: #fff; border: none; padding: 11px 20px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: inherit; font-size: 13.5px; box-shadow: 0 2px 6px rgba(13,85,89,.3); transition: transform .1s, box-shadow .15s; }
+  .btn:hover, #login-box button:hover { box-shadow: 0 4px 10px rgba(13,85,89,.38); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+
+  /* ---------- Shell layout ---------- */
   #app { display: none; }
-  .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .prod-thumb { width: 42px; height: 42px; object-fit: cover; border-radius: 8px; background: #eee; }
+  .admin-shell { display: flex; min-height: 100vh; }
+
+  .admin-sidebar { width: 240px; flex-shrink: 0; background: linear-gradient(180deg, var(--navy), var(--navy-light)); color: #cdd3d8; display: flex; flex-direction: column; padding: 20px 14px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 20px; }
+  .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--teal)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #06201f; flex-shrink: 0; }
+  .sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+  .sidebar-brand-text strong { font-size: 13px; color: #fff; }
+  .sidebar-brand-text span { font-size: 11px; color: #7e8d96; }
+
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .sidebar-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #5c6b74; font-weight: 700; padding: 14px 10px 6px; }
+  .sidebar-group-label:first-child { padding-top: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; background: none; border: none; color: #b7c0c6; padding: 9px 10px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; text-align: left; width: 100%; transition: background .12s, color .12s; position: relative; }
+  .nav-item svg { flex-shrink: 0; opacity: .85; }
+  .nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .nav-item.active { background: rgba(45,212,191,.14); color: #fff; }
+  .nav-item.active svg { opacity: 1; color: var(--accent); }
+  .nav-item.active::before { content: ''; position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; background: var(--accent); border-radius: 0 3px 3px 0; }
+  .nav-item .unread-badge { margin-left: auto; }
+
+  .sidebar-logout { display: flex; align-items: center; gap: 10px; background: none; border: none; border-top: 1px solid rgba(255,255,255,.08); color: #8a97a0; padding: 14px 10px 4px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 10px; }
+  .sidebar-logout:hover { color: #fff; }
+
+  .admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .admin-topbar { display: flex; align-items: center; gap: 14px; padding: 22px 32px 18px; background: var(--bg); position: sticky; top: 0; z-index: 20; }
+  .admin-topbar h1 { font-size: 21px; }
+  .mobile-menu-btn { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; width: 38px; height: 38px; align-items: center; justify-content: center; cursor: pointer; color: var(--text); flex-shrink: 0; box-shadow: var(--shadow-sm); }
+  .admin-content { padding: 0 32px 40px; flex: 1; }
+  .sidebar-scrim { display: none; }
+
+  /* ---------- Shared components ---------- */
+  section { margin-bottom: 28px; }
+  section > h2 { font-size: 15px; margin-bottom: 14px; color: var(--text); }
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .section-head h2 { margin: 0 !important; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin: 0 0 20px; }
+  .card { background: var(--surface); border-radius: var(--radius); padding: 18px 20px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: box-shadow .15s, transform .15s; }
+  .card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .card .num { font-size: 28px; font-weight: 800; color: var(--teal); letter-spacing: -0.02em; }
+  .card .label { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; margin-bottom: 24px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+  th, td { padding: 12px 16px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); }
+  th { background: #fafbfc; font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+  tbody tr { transition: background .1s; }
+  tbody tr:hover { background: #fafbfc; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .pill { display: inline-block; padding: 4px 11px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fdf0d5; color: #8a5f00; }
+  .pill.done { background: #d9f2e6; color: #0c7a4e; }
+
+  .stage-stepper { display: flex; align-items: center; flex-wrap: wrap; gap: 0; font-size: 11px; }
+  .stage-step { display: flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; color: var(--text-faint); background: #f0f1f3; white-space: nowrap; font-weight: 600; }
+  .stage-step.done { color: #0c7a4e; background: #d9f2e6; }
+  .stage-step.current { color: #fff; background: var(--teal); box-shadow: 0 1px 4px rgba(13,85,89,.35); }
+  .stage-arrow { color: #d2d5d9; margin: 0 3px; font-size: 10px; }
+  .stage-select { margin-top: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 12px; background: var(--surface); }
+
+  .prod-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 9px; background: #eee; border: 1px solid var(--border); }
   .btn-sm { padding: 6px 14px; font-size: 12px; }
-  .btn-outline-sm { background: #fff; color: #0d5559; border: 1px solid #0d5559; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .btn-danger-sm { background: #fff; color: #c0392b; border: 1px solid #c0392b; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .btn-outline-sm { background: var(--surface); color: var(--teal); border: 1.5px solid var(--teal); padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .12s; }
+  .btn-outline-sm:hover { background: #eaf5f4; }
+  .btn-danger-sm { background: var(--surface); color: var(--danger); border: 1.5px solid var(--danger); padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .12s; }
+  .btn-danger-sm:hover { background: #fdecec; }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(10,20,32,.55); backdrop-filter: blur(2px); align-items: center; justify-content: center; z-index: 50; padding: 20px; }
   .modal-overlay.open { display: flex; }
-  .modal { background: #fff; border-radius: 16px; padding: 24px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
-  .modal h3 { margin-top: 0; }
-  .form-row { margin-bottom: 12px; }
-  .form-row label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #444; }
-  .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 9px 11px; border: 1px solid #e2e4e1; border-radius: 10px; font-family: inherit; font-size: 13px; }
+  .modal { background: var(--surface); border-radius: 18px; padding: 28px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+  .modal h3 { margin-top: 0; margin-bottom: 18px; font-size: 17px; }
+  .form-row { margin-bottom: 14px; }
+  .form-row label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #444; }
+  .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; transition: border-color .15s; }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus { outline: none; border-color: var(--teal); }
   .form-row textarea { min-height: 70px; resize: vertical; }
   .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .image-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
   .image-item { position: relative; width: 64px; height: 64px; }
-  .image-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
-  .image-item button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #c0392b; color: #fff; border: none; font-size: 11px; line-height: 1; cursor: pointer; }
-  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
-  .btn-cancel { background: #f0f0ee; color: #333; border: none; padding: 10px 18px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: inherit; }
+  .image-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+  .image-item button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--danger); color: #fff; border: none; font-size: 11px; line-height: 1; cursor: pointer; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .btn-cancel { background: #f0f1f3; color: #333; border: none; padding: 11px 20px; border-radius: 999px; cursor: pointer; font-weight: 600; font-family: inherit; font-size: 13.5px; }
+  .btn-cancel:hover { background: #e5e6e9; }
 
-  .mail-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
-  .mail-tab { background: #fff; border: 1px solid #e2e4e1; color: #444; padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .mail-tab.active { background: #0d5559; color: #fff; border-color: #0d5559; }
-  .unibox { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 0; background: #fff; border-radius: 14px; overflow: hidden; min-height: 420px; }
-  .mail-list { border-right: 1px solid #eee; max-height: 560px; overflow-y: auto; }
-  .mail-row { padding: 12px 16px; border-bottom: 1px solid #f1f1ef; cursor: pointer; }
-  .mail-row:hover { background: #f8f8f7; }
-  .mail-row.active { background: #eaf3f2; }
+  /* ---------- Email / unibox ---------- */
+  .mail-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .mail-tab { background: var(--surface); border: 1px solid var(--border); color: #444; padding: 8px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .mail-tab.active { background: var(--teal); color: #fff; border-color: var(--teal); }
+  .unibox { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 0; background: var(--surface); border-radius: var(--radius); overflow: hidden; min-height: 420px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+  .mail-list { border-right: 1px solid var(--border); max-height: 560px; overflow-y: auto; }
+  .mail-row { padding: 13px 16px; border-bottom: 1px solid #f1f1ef; cursor: pointer; transition: background .1s; }
+  .mail-row:hover { background: #fafbfc; }
+  .mail-row.active { background: #eaf5f4; }
   .mail-row.unread .mail-from { font-weight: 800; }
   .mail-from { font-size: 13px; }
   .mail-subject { font-size: 13px; color: #333; margin: 2px 0; }
   .mail-snippet { font-size: 12px; color: #8a8e90; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mail-date { font-size: 11px; color: #aaa; }
-  .mail-reading-pane { padding: 20px; max-height: 560px; overflow-y: auto; }
+  .mail-reading-pane { padding: 22px; max-height: 560px; overflow-y: auto; }
   .mail-reading-pane h3 { margin: 0 0 6px; font-size: 16px; }
-  .mail-meta { font-size: 12px; color: #6b7074; margin-bottom: 14px; }
+  .mail-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
   .mail-body { font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
   .mail-empty { padding: 40px 20px; text-align: center; color: #aaa; font-size: 13px; }
-  .unread-badge { display: inline-block; background: #c0392b; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
+  .unread-badge { display: inline-block; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
   .unread-badge:empty { display: none; }
   .reply-btn { margin-top: 16px; }
-  .inline-reply { margin-top: 16px; border: 1px solid #e2e4e1; border-radius: 12px; padding: 14px; background: #fafaf9; }
+  .inline-reply { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; background: #fafaf9; }
   .reply-toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
-  .reply-toolbar button { background: #fff; border: 1px solid #e2e4e1; border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .reply-toolbar button { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: inherit; }
   .reply-toolbar button:hover { background: #eee; }
-  .inline-reply textarea { width: 100%; min-height: 120px; padding: 10px; border: 1px solid #e2e4e1; border-radius: 10px; font-family: inherit; font-size: 13px; resize: vertical; }
+  .inline-reply textarea { width: 100%; min-height: 120px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; resize: vertical; }
   .attach-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-  .attach-chip { display: inline-flex; align-items: center; gap: 6px; background: #eaf3f2; color: #0d5559; font-size: 12px; padding: 4px 10px; border-radius: 999px; }
-  .attach-chip button { background: none; border: none; color: #0d5559; cursor: pointer; font-weight: 700; font-size: 13px; padding: 0; }
+  .attach-chip { display: inline-flex; align-items: center; gap: 6px; background: #eaf5f4; color: var(--teal); font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+  .attach-chip button { background: none; border: none; color: var(--teal); cursor: pointer; font-weight: 700; font-size: 13px; padding: 0; }
   .inline-reply-actions { display: flex; gap: 10px; margin-top: 10px; }
 
-  .panel-tabs { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; border-bottom: 1px solid #e2e4e1; padding-bottom: 0; }
-  .panel-tab { background: none; border: none; padding: 10px 18px; font-size: 14px; font-weight: 600; color: #6b7074; cursor: pointer; font-family: inherit; border-bottom: 3px solid transparent; margin-bottom: -1px; }
-  .panel-tab.active { color: #0d5559; border-bottom-color: #0d5559; }
-  .panel { display: none; }
+  .panel { display: none; animation: fadeIn .18s ease; }
   .panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ---------- Responsive: mobile & tablet ---------- */
+  @media (max-width: 880px) {
+    .admin-sidebar { position: fixed; left: 0; top: 0; z-index: 101; transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow-lg); }
+    .admin-sidebar.open { transform: translateX(0); }
+    .sidebar-scrim.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; }
+    .mobile-menu-btn { display: flex; }
+    .admin-topbar { padding: 16px 16px 14px; }
+    .admin-topbar h1 { font-size: 18px; }
+    .admin-content { padding: 0 14px 32px; }
+    .cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .card { padding: 14px 16px; }
+    .card .num { font-size: 22px; }
+    table { display: block; overflow-x: auto; white-space: nowrap; }
+    .unibox { grid-template-columns: 1fr; }
+    .mail-list { max-height: 260px; border-right: none; border-bottom: 1px solid var(--border); }
+    .mail-reading-pane { max-height: none; }
+    .form-grid-2 { grid-template-columns: 1fr; }
+    .modal { padding: 20px; border-radius: 16px; }
+    .section-head { align-items: flex-start; }
+  }
+  @media (max-width: 520px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+    #login-box { margin: 18vh auto; max-width: 92vw; padding: 28px 22px; }
+  }
 </style>
 </head>
 <body>
@@ -102,24 +200,55 @@
 </div>
 
 <div id="app">
-  <div class="wrap">
-    <h1>Life Style Ceramics — Dashboard</h1>
-    <p class="muted" id="refreshed"></p>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">LC</div>
+        <div class="sidebar-brand-text">
+          <strong>Life Style Ceramics</strong>
+          <span>Control Panel</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-group-label">Overview</div>
+        <button class="nav-item active" id="ptab-overview" onclick="switchPanel('overview')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></button>
+        <button class="nav-item" id="ptab-email" onclick="switchPanel('email')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span>Email</span><span class="unread-badge" id="inbox-unread-badge-nav"></span></button>
 
-    <div class="panel-tabs">
-      <button class="panel-tab active" id="ptab-overview" onclick="switchPanel('overview')">Overview</button>
-      <button class="panel-tab" id="ptab-email" onclick="switchPanel('email')">Email</button>
-      <button class="panel-tab" id="ptab-products" onclick="switchPanel('products')">Products</button>
-      <button class="panel-tab" id="ptab-stock" onclick="switchPanel('stock')">Stock</button>
-      <button class="panel-tab" id="ptab-quotes" onclick="switchPanel('quotes')">Quotes</button>
-      <button class="panel-tab" id="ptab-clients" onclick="switchPanel('clients')">Clients</button>
-      <button class="panel-tab" id="ptab-documents" onclick="switchPanel('documents')">Documents</button>
-      <button class="panel-tab" id="ptab-visitors" onclick="switchPanel('visitors')">Visitors</button>
-      <button class="panel-tab" id="ptab-activity" onclick="switchPanel('activity')">Activity Log</button>
-      <button class="panel-tab" id="ptab-users" onclick="switchPanel('users')">Users</button>
-      <button class="panel-tab" id="ptab-settings" onclick="switchPanel('settings')">Settings</button>
-    </div>
+        <div class="sidebar-group-label">Sales</div>
+        <button class="nav-item" id="ptab-quotes" onclick="switchPanel('quotes')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h6"/></svg><span>Quotes</span></button>
+        <button class="nav-item" id="ptab-clients" onclick="switchPanel('clients')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3.1-6 7-6s7 2 7 6"/><circle cx="17" cy="8" r="3"/><path d="M22 21c0-3.3-2-5.3-4.5-5.9"/></svg><span>Clients</span></button>
+        <button class="nav-item" id="ptab-documents" onclick="switchPanel('documents')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/></svg><span>Documents</span></button>
 
+        <div class="sidebar-group-label">Inventory</div>
+        <button class="nav-item" id="ptab-products" onclick="switchPanel('products')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span>Products</span></button>
+        <button class="nav-item" id="ptab-stock" onclick="switchPanel('stock')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg><span>Stock</span></button>
+
+        <div class="sidebar-group-label">Insights</div>
+        <button class="nav-item" id="ptab-visitors" onclick="switchPanel('visitors')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>Visitors</span></button>
+        <button class="nav-item" id="ptab-activity" onclick="switchPanel('activity')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>Activity Log</span></button>
+
+        <div class="sidebar-group-label">Admin</div>
+        <button class="nav-item" id="ptab-users" onclick="switchPanel('users')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span>Users</span></button>
+        <button class="nav-item" id="ptab-settings" onclick="switchPanel('settings')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>Settings</span></button>
+      </nav>
+      <button class="sidebar-logout" onclick="sessionStorage.removeItem('lsc_admin_pw'); location.reload();">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <span>Log Out</span>
+      </button>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <button class="mobile-menu-btn" onclick="toggleSidebar(true)" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div>
+          <h1 id="topbar-title">Dashboard</h1>
+          <p class="muted" id="refreshed"></p>
+        </div>
+      </div>
+
+      <div class="admin-content">
     <div class="panel active" id="panel-overview">
       <section>
         <h2 style="font-size:16px;">Overview</h2>
@@ -301,6 +430,9 @@
         <p class="muted" id="settings-status" style="margin-top:10px;"></p>
       </section>
     </div>
+      </div>
+    </main>
+    <div class="sidebar-scrim" onclick="toggleSidebar(false)"></div>
   </div>
 </div>
 
@@ -721,11 +853,17 @@
 
   // ---------- Panel tabs ----------
   const PANEL_NAMES = ['overview', 'email', 'products', 'stock', 'quotes', 'clients', 'documents', 'visitors', 'activity', 'users', 'settings'];
+  const PANEL_TITLES = {
+    overview: 'Dashboard', email: 'Email', products: 'Products', stock: 'Stock Control',
+    quotes: 'Quote Requests', clients: 'Clients', documents: 'Documents',
+    visitors: 'Visitors', activity: 'Activity Log', users: 'Admin Users', settings: 'Settings',
+  };
   function switchPanel(name) {
     PANEL_NAMES.forEach((p) => {
       document.getElementById('panel-' + p).classList.toggle('active', p === name);
       document.getElementById('ptab-' + p).classList.toggle('active', p === name);
     });
+    document.getElementById('topbar-title').textContent = PANEL_TITLES[name] || 'Dashboard';
     if (name === 'stock') loadStock();
     if (name === 'clients') loadClients();
     if (name === 'documents') loadDocuments();
@@ -733,6 +871,12 @@
     if (name === 'overview') loadOverviewExtras();
     if (name === 'activity') loadActivity();
     if (name === 'users') loadUsersTab();
+    toggleSidebar(false);
+  }
+
+  function toggleSidebar(open) {
+    document.querySelector('.admin-sidebar').classList.toggle('open', open);
+    document.querySelector('.sidebar-scrim').classList.toggle('open', open);
   }
 
   // ---------- Unibox: real Inbox/Outbox pulled live via IMAP ----------
@@ -760,6 +904,7 @@
   function updateUnreadBadge() {
     const count = currentMailFolder === 'inbox' ? currentMailMessages.filter((m) => !m.seen).length : 0;
     document.getElementById('inbox-unread-badge').textContent = count > 0 ? count : '';
+    document.getElementById('inbox-unread-badge-nav').textContent = count > 0 ? count : '';
   }
 
   function loadMail(folder) {
