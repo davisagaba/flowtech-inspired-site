@@ -54,7 +54,7 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
   z-index: 100;
   max-width: 1200px;
   margin: 0 auto;
-  background: var(--red);
+  background: #0a0f16;
   border-radius: 999px;
 }
 .nav-inner {
