@@ -159,6 +159,8 @@
   .unread-badge { display: inline-block; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
   .unread-badge:empty { display: none; }
   .reply-btn { margin-top: 16px; }
+  .reading-actions { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
+  .reading-actions .reply-btn { margin-top: 0; }
   .inline-reply { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; background: #fafaf9; }
   .reply-toolbar { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
   .reply-toolbar button { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: inherit; }
@@ -291,9 +293,9 @@
             <button class="btn" style="padding:8px 16px;font-size:12px;" onclick="openCompose()">+ Compose</button>
           </div>
         </div>
-        <div class="mail-tabs">
+        <div class="mail-tabs" id="mail-tabs">
           <button class="mail-tab active" id="tab-inbox" onclick="switchMailTab('inbox')">Inbox <span class="unread-badge" id="inbox-unread-badge"></span></button>
-          <button class="mail-tab" id="tab-outbox" onclick="switchMailTab('outbox')">Outbox</button>
+          <button class="mail-tab" id="tab-outbox" onclick="switchMailTab('outbox')">Sent</button>
         </div>
         <input type="text" id="mail-search" class="form-row" style="width:100%;padding:9px 11px;border:1px solid #e2e4e1;border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:10px;" placeholder="Search by sender, subject or content…" oninput="renderMailList()">
         <div class="unibox">
@@ -544,6 +546,10 @@
       <input type="email" id="c-to" placeholder="customer@example.com">
     </div>
     <div class="form-row">
+      <label>Cc (optional)</label>
+      <input type="text" id="c-cc" placeholder="cc@example.com, another@example.com">
+    </div>
+    <div class="form-row">
       <label>Subject</label>
       <input type="text" id="c-subject" placeholder="Subject">
     </div>
@@ -684,6 +690,7 @@
         document.getElementById('app').style.display = 'block';
         render(data);
         loadProducts();
+        loadMailFolders();
         loadMail(currentMailFolder);
         loadOverviewExtras();
         loadWhoami();
@@ -966,18 +973,36 @@
     document.querySelector('.sidebar-scrim').classList.toggle('open', open);
   }
 
-  // ---------- Unibox: real Inbox/Outbox pulled live via IMAP ----------
+  // ---------- Unibox: full Titan folder set (Inbox/Sent/Drafts/Junk/Archive/Trash) ----------
   let currentMailFolder = 'inbox';
   let currentMailMessages = [];
   let currentMailSearch = '';
   let openMailIndex = null;
+  let mailFolders = [
+    { key: 'inbox', label: 'Inbox', path: 'INBOX' },
+    { key: 'outbox', label: 'Sent', path: null },
+  ];
+
+  function loadMailFolders() {
+    fetch('/api/admin/mailbox/folders?' + authQS())
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) return;
+        mailFolders = data.folders;
+        document.getElementById('mail-tabs').innerHTML = mailFolders.map((f) => `
+          <button class="mail-tab ${f.key === currentMailFolder ? 'active' : ''}" id="tab-${f.key}" onclick="switchMailTab('${f.key}')">
+            ${f.label}${f.key === 'inbox' ? ' <span class="unread-badge" id="inbox-unread-badge"></span>' : ''}
+          </button>
+        `).join('');
+      })
+      .catch(() => { /* keep the default Inbox/Sent tabs if this fails */ });
+  }
 
   function switchMailTab(folder) {
     currentMailFolder = folder;
     currentMailSearch = '';
     document.getElementById('mail-search').value = '';
-    document.getElementById('tab-inbox').classList.toggle('active', folder === 'inbox');
-    document.getElementById('tab-outbox').classList.toggle('active', folder === 'outbox');
+    mailFolders.forEach((f) => document.getElementById('tab-' + f.key)?.classList.toggle('active', f.key === folder));
     document.getElementById('mail-reading-pane').innerHTML = '<div class="mail-empty">Select a message to read it</div>';
     openMailIndex = null;
     loadMail(folder);
@@ -1006,7 +1031,11 @@
   function loadMail(folder) {
     const list = document.getElementById('mail-list');
     list.innerHTML = '<div class="mail-empty">Loading…</div>';
-    fetch('/api/admin/mailbox/' + folder + '?' + authQS() + '&limit=30', { cache: 'no-store' })
+    const def = mailFolders.find((f) => f.key === folder);
+    const url = (folder === 'inbox' || folder === 'outbox')
+      ? '/api/admin/mailbox/' + folder + '?' + authQS() + '&limit=30'
+      : '/api/admin/mailbox/folder?path=' + encodeURIComponent((def && def.path) || folder) + '&' + authQS() + '&limit=30';
+    fetch(url, { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Failed to load mailbox');
@@ -1060,6 +1089,13 @@
     document.querySelector(`.mail-row[data-i="${i}"]`)?.classList.add('active');
     const m = currentMailMessages[i];
     const headerInitial = (m.from || '?').replace(/<.*/, '').trim().charAt(0).toUpperCase() || '?';
+    const def = mailFolders.find((f) => f.key === currentMailFolder);
+    const folderPath = m.folder || (def && def.path) || (currentMailFolder === 'inbox' ? 'INBOX' : currentMailFolder);
+    const attachmentsHtml = (m.attachments && m.attachments.length)
+      ? `<div class="attach-chips" style="margin-top:12px;">${m.attachments.map((a) =>
+          `<a class="attach-chip" style="text-decoration:none;" href="/api/admin/mailbox/attachment?folder=${encodeURIComponent(folderPath)}&uid=${m.uid}&index=${a.index}&${authQS()}" target="_blank">📎 ${a.filename}</a>`
+        ).join('')}</div>`
+      : '';
     document.getElementById('mail-reading-pane').innerHTML = `
       <div class="reading-header">
         <div class="mail-avatar mail-avatar-lg">${headerInitial}</div>
@@ -1068,12 +1104,19 @@
           <div class="mail-meta">
             <span><strong>From</strong> ${m.from || '—'}</span>
             <span><strong>To</strong> ${m.to || '—'}</span>
+            ${m.cc ? `<span><strong>Cc</strong> ${m.cc}</span>` : ''}
             <span>${fmtMailDate(m.date)}</span>
           </div>
         </div>
       </div>
       <div class="mail-body">${formatMailBody(m.body)}</div>
-      ${currentMailFolder === 'inbox' ? `<button class="btn reply-btn" id="reply-toggle-btn" onclick="showInlineReply(${i})">Reply</button><div id="inline-reply-box"></div>` : ''}
+      ${attachmentsHtml}
+      <div class="reading-actions">
+        ${currentMailFolder === 'inbox' ? `<button class="btn reply-btn" id="reply-toggle-btn" onclick="showInlineReply(${i})">Reply</button>` : ''}
+        <button class="btn-outline-sm reply-btn" onclick="openCompose(${i})">Forward</button>
+        ${currentMailFolder !== 'trash' ? `<button class="btn-danger-sm reply-btn" onclick="deleteMailMessage(${i})">Delete</button>` : ''}
+      </div>
+      <div id="inline-reply-box"></div>
     `;
 
     if (currentMailFolder === 'inbox' && !m.seen) {
@@ -1088,6 +1131,26 @@
         document.querySelector(`.mail-row[data-i="${i}"]`)?.classList.add('active');
       }).catch(() => {});
     }
+  }
+
+  function deleteMailMessage(i) {
+    const m = currentMailMessages[i];
+    const def = mailFolders.find((f) => f.key === currentMailFolder);
+    const folderPath = m.folder || (def && def.path) || (currentMailFolder === 'inbox' ? 'INBOX' : currentMailFolder);
+    if (!confirm('Delete this message? It will be moved to Trash.')) return;
+    fetch('/api/admin/mailbox/delete?' + authQS(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder: folderPath, uid: m.uid }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Delete failed');
+        showMailToast('Message moved to Trash.');
+        document.getElementById('mail-reading-pane').innerHTML = '<div class="mail-empty">Select a message to read it</div>';
+        loadMail(currentMailFolder);
+      })
+      .catch((err) => alert('Could not delete: ' + err.message));
   }
 
   // ---------- Inline Reply (stays in the Inbox tab, no modal) ----------
@@ -1317,14 +1380,19 @@
   }
 
   // ---------- Compose (new email, modal) ----------
-  function openCompose() {
-    document.getElementById('compose-modal-title').textContent = 'Compose Email';
+  function openCompose(forwardIndex) {
+    const fwd = (typeof forwardIndex === 'number') ? currentMailMessages[forwardIndex] : null;
+    document.getElementById('compose-modal-title').textContent = fwd ? 'Forward Email' : 'Compose Email';
     document.getElementById('c-in-reply-to').value = '';
     document.getElementById('c-to').value = '';
-    document.getElementById('c-subject').value = '';
-    document.getElementById('c-body').value = '';
+    document.getElementById('c-cc').value = '';
+    document.getElementById('c-subject').value = fwd ? (/^fwd:/i.test(fwd.subject) ? fwd.subject : 'Fwd: ' + fwd.subject) : '';
+    document.getElementById('c-body').value = fwd
+      ? `\n\n---------- Forwarded message ----------\nFrom: ${fwd.from}\nDate: ${fmtMailDate(fwd.date)}\nSubject: ${fwd.subject}\nTo: ${fwd.to}\n\n${fwd.body || ''}`
+      : '';
     document.getElementById('compose-status').textContent = '';
     document.getElementById('compose-modal').classList.add('open');
+    if (fwd) document.getElementById('c-to').focus();
   }
 
   function closeCompose() {
@@ -1333,6 +1401,7 @@
 
   function sendCompose() {
     const to = document.getElementById('c-to').value.trim();
+    const cc = document.getElementById('c-cc').value.trim();
     const subject = document.getElementById('c-subject').value.trim();
     const body = document.getElementById('c-body').value;
     const inReplyTo = document.getElementById('c-in-reply-to').value || undefined;
@@ -1345,7 +1414,7 @@
     fetch('/api/admin/mailbox/send?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, body, inReplyTo }),
+      body: JSON.stringify({ to, cc: cc || undefined, subject, body, inReplyTo }),
     })
       .then((r) => r.json())
       .then((data) => {

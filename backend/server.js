@@ -104,24 +104,31 @@ async function fetchMailbox(folder, limit) {
         for await (const msg of client.fetch(`${start}:${total}`, { envelope: true, flags: true, source: true })) {
           let snippet = '';
           let body = '';
+          let attachments = [];
           try {
             const parsed = await simpleParser(msg.source);
             body = (parsed.text || '').trim().slice(0, 5000);
             snippet = body.replace(/\s+/g, ' ').slice(0, 200);
+            attachments = (parsed.attachments || []).map((a, idx) => ({
+              index: idx, filename: a.filename || `attachment-${idx + 1}`, size: a.size, contentType: a.contentType,
+            }));
           } catch {
-            /* ignore parse failure, snippet/body stay empty */
+            /* ignore parse failure, snippet/body/attachments stay empty */
           }
           messages.push({
             uid: msg.uid,
+            folder,
             from: msg.envelope.from && msg.envelope.from[0] ? `${msg.envelope.from[0].name || ''} <${msg.envelope.from[0].address}>`.trim() : '',
             fromAddress: msg.envelope.from && msg.envelope.from[0] ? msg.envelope.from[0].address : '',
             to: msg.envelope.to && msg.envelope.to[0] ? msg.envelope.to[0].address : '',
+            cc: (msg.envelope.cc || []).map((a) => a.address).join(', '),
             subject: msg.envelope.subject || '(no subject)',
             date: msg.envelope.date,
             seen: msg.flags.has('\\Seen'),
             messageId: msg.envelope.messageId || '',
             snippet,
             body,
+            attachments,
           });
         }
       }
@@ -1211,22 +1218,54 @@ app.post('/admin/mailbox/upload-attachment', requireAdmin, uploadAttachment.sing
   res.json({ ok: true, id: req.file.filename, filename: req.file.originalname, size: req.file.size });
 });
 
-// --- Live mailbox (unibox: real Inbox/Outbox from the actual mailbox) ---
-let sentFolderNameCache = null;
-async function findSentFolder() {
-  if (sentFolderNameCache) return sentFolderNameCache;
+// --- Live mailbox (unibox: full Titan/IMAP folder set, not just Inbox/Sent) ---
+let folderCache = null;
+async function listFolders() {
+  if (folderCache) return folderCache;
   const client = imapClient();
   await client.connect();
   try {
-    const list = await client.list();
-    const sent = list.find((f) => f.specialUse === '\\Sent')
-      || list.find((f) => /^sent/i.test(f.name) || /sent items/i.test(f.name));
-    sentFolderNameCache = sent ? sent.path : 'Sent Messages';
-    return sentFolderNameCache;
+    folderCache = await client.list();
+    return folderCache;
   } finally {
     await client.logout().catch(() => {});
   }
 }
+async function findSpecialFolder(specialUse, nameRegex, fallback) {
+  const list = await listFolders();
+  const found = list.find((f) => f.specialUse === specialUse) || list.find((f) => nameRegex.test(f.name));
+  return found ? found.path : fallback;
+}
+async function findSentFolder() { return findSpecialFolder('\\Sent', /^sent/i, 'Sent Messages'); }
+async function findTrashFolder() { return findSpecialFolder('\\Trash', /^trash|deleted/i, 'Trash'); }
+async function findDraftsFolder() { return findSpecialFolder('\\Drafts', /^drafts/i, 'Drafts'); }
+async function findJunkFolder() { return findSpecialFolder('\\Junk', /^junk|spam/i, 'Junk'); }
+async function findArchiveFolder() { return findSpecialFolder('\\Archive', /^archive/i, 'Archive'); }
+
+// Lists every real folder in the mailbox, labeled for the unibox's folder
+// tabs — the same set Titan's own webmail shows (Inbox/Sent/Drafts/Trash/
+// Junk/Archive), not a fixed Inbox+Outbox pair.
+app.get('/admin/mailbox/folders', requireAdmin, async (req, res) => {
+  try {
+    const [sent, drafts, trash, junk, archive] = await Promise.all([
+      findSentFolder(), findDraftsFolder(), findTrashFolder(), findJunkFolder(), findArchiveFolder(),
+    ]);
+    res.json({
+      ok: true,
+      folders: [
+        { key: 'inbox', label: 'Inbox', path: 'INBOX' },
+        { key: 'outbox', label: 'Sent', path: sent },
+        { key: 'drafts', label: 'Drafts', path: drafts },
+        { key: 'junk', label: 'Junk', path: junk },
+        { key: 'archive', label: 'Archive', path: archive },
+        { key: 'trash', label: 'Trash', path: trash },
+      ],
+    });
+  } catch (err) {
+    console.error('Folder list error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 app.get('/admin/mailbox/inbox', requireAdmin, async (req, res) => {
   try {
@@ -1247,6 +1286,22 @@ app.get('/admin/mailbox/outbox', requireAdmin, async (req, res) => {
     res.json({ ok: true, messages, folder });
   } catch (err) {
     console.error('Outbox fetch error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Generic fetch for any folder by its exact IMAP path (Drafts/Junk/Archive/
+// Trash, or any custom folder) — used alongside the dedicated inbox/outbox
+// routes above so existing callers keep working unchanged.
+app.get('/admin/mailbox/folder', requireAdmin, async (req, res) => {
+  try {
+    const path = req.query.path;
+    if (!path) return res.status(400).json({ ok: false, error: 'Missing path.' });
+    const limit = Math.min(Number(req.query.limit) || 25, 100);
+    const messages = await fetchMailbox(path, limit);
+    res.json({ ok: true, messages });
+  } catch (err) {
+    console.error('Folder fetch error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -1276,7 +1331,7 @@ function resolveDocumentRefs(documentRefs) {
 
 app.post('/admin/mailbox/send', requireAdmin, async (req, res) => {
   try {
-    const { to, subject, body, inReplyTo, references, attachmentIds, documentRefs } = req.body || {};
+    const { to, cc, bcc, subject, body, inReplyTo, references, attachmentIds, documentRefs } = req.body || {};
     if (!to || !subject || !body) {
       return res.status(400).json({ ok: false, error: 'Missing to, subject or body.' });
     }
@@ -1298,6 +1353,8 @@ app.post('/admin/mailbox/send', requireAdmin, async (req, res) => {
       to,
       subject,
       text: body,
+      ...(cc ? { cc } : {}),
+      ...(bcc ? { bcc } : {}),
       ...(inReplyTo ? { inReplyTo, references: references || inReplyTo } : {}),
       ...(allAttachments.length ? { attachments: allAttachments } : {}),
     };
@@ -1349,6 +1406,97 @@ app.post('/admin/mailbox/mark-read', requireAdmin, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('Mark-read error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Move a message between folders (used for Delete -> Trash, and for
+// "move to" actions) — mirrors Titan's own webmail behavior.
+app.post('/admin/mailbox/move', requireAdmin, async (req, res) => {
+  try {
+    const { fromFolder, uid, toFolder } = req.body || {};
+    if (!fromFolder || !uid || !toFolder) {
+      return res.status(400).json({ ok: false, error: 'Missing fromFolder, uid or toFolder.' });
+    }
+    const client = imapClient();
+    await client.connect();
+    try {
+      const lock = await client.getMailboxLock(fromFolder);
+      try {
+        await client.messageMove({ uid: String(uid) }, toFolder, { uid: true });
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout().catch(() => {});
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Mailbox move error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Delete = move to Trash (never a permanent expunge), same as clicking
+// Delete in Titan's webmail.
+app.post('/admin/mailbox/delete', requireAdmin, async (req, res) => {
+  try {
+    const { folder, uid } = req.body || {};
+    if (!folder || !uid) return res.status(400).json({ ok: false, error: 'Missing folder or uid.' });
+    const trash = await findTrashFolder();
+    const client = imapClient();
+    await client.connect();
+    try {
+      const lock = await client.getMailboxLock(folder);
+      try {
+        await client.messageMove({ uid: String(uid) }, trash, { uid: true });
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout().catch(() => {});
+    }
+    logActivity(req.adminUser, 'deleted_email', `uid ${uid} from ${folder}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Mailbox delete error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Downloads one attachment from a message by re-fetching and re-parsing it
+// (attachment binary content isn't kept in memory between requests).
+app.get('/admin/mailbox/attachment', requireAdmin, async (req, res) => {
+  try {
+    const { folder, uid, index } = req.query;
+    if (!folder || !uid || index === undefined) {
+      return res.status(400).json({ ok: false, error: 'Missing folder, uid or index.' });
+    }
+    const client = imapClient();
+    await client.connect();
+    let source;
+    try {
+      const lock = await client.getMailboxLock(folder);
+      try {
+        const msg = await client.fetchOne(String(uid), { source: true }, { uid: true });
+        source = msg && msg.source;
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout().catch(() => {});
+    }
+    if (!source) return res.status(404).json({ ok: false, error: 'Message not found.' });
+
+    const parsed = await simpleParser(source);
+    const attachment = (parsed.attachments || [])[Number(index)];
+    if (!attachment) return res.status(404).json({ ok: false, error: 'Attachment not found.' });
+
+    res.setHeader('Content-Type', attachment.contentType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${(attachment.filename || 'attachment').replace(/"/g, '')}"`);
+    res.send(attachment.content);
+  } catch (err) {
+    console.error('Attachment download error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
