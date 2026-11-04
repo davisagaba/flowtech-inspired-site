@@ -226,11 +226,11 @@
 
         <div class="sidebar-group-label">Insights</div>
         <button class="nav-item" id="ptab-visitors" onclick="switchPanel('visitors')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>Visitors</span></button>
-        <button class="nav-item" id="ptab-activity" onclick="switchPanel('activity')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>Activity Log</span></button>
+        <button class="nav-item owner-only" id="ptab-activity" onclick="switchPanel('activity')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>Activity Log</span></button>
 
         <div class="sidebar-group-label">Admin</div>
-        <button class="nav-item" id="ptab-users" onclick="switchPanel('users')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span>Users</span></button>
-        <button class="nav-item" id="ptab-settings" onclick="switchPanel('settings')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>Settings</span></button>
+        <button class="nav-item owner-only" id="ptab-users" onclick="switchPanel('users')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span>Users</span></button>
+        <button class="nav-item owner-only" id="ptab-settings" onclick="switchPanel('settings')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>Settings</span></button>
       </nav>
       <button class="sidebar-logout" onclick="sessionStorage.removeItem('lsc_admin_pw'); sessionStorage.removeItem('lsc_admin_user'); location.reload();">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
@@ -632,6 +632,7 @@
         loadProducts();
         loadMail(currentMailFolder);
         loadOverviewExtras();
+        loadWhoami();
       })
       .catch(() => {
         document.getElementById('login-error').textContent = 'Incorrect username or password.';
@@ -642,6 +643,24 @@
     fetch('/api/analytics?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => { if (data.ok) render(data); });
+  }
+
+  // ---------- Role-based access ----------
+  let currentUserRole = 'staff';
+  function applyRoleUI() {
+    document.querySelectorAll('.owner-only').forEach((el) => {
+      el.style.display = currentUserRole === 'admin' ? '' : 'none';
+    });
+  }
+  function loadWhoami() {
+    return fetch('/api/admin/whoami?' + authQS())
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          currentUserRole = data.role;
+          applyRoleUI();
+        }
+      });
   }
 
   // ---------- Product management ----------
@@ -684,7 +703,7 @@
           <td>${p.stock ? 'Yes' : 'No'}</td>
           <td>
             <button class="btn-outline-sm" onclick="openProductForm(${p.id})">Edit</button>
-            <button class="btn-danger-sm" onclick="deleteProduct(${p.id})">Delete</button>
+            ${currentUserRole === 'admin' ? `<button class="btn-danger-sm" onclick="deleteProduct(${p.id})">Delete</button>` : ''}
           </td>
         </tr>`;
       }).join('') || '<tr><td colspan="6" class="muted">No products yet</td></tr>';
@@ -868,7 +887,11 @@
     quotes: 'Quote Requests', clients: 'Clients', documents: 'Documents',
     visitors: 'Visitors', activity: 'Activity Log', users: 'Admin Users', settings: 'Settings',
   };
+  const OWNER_ONLY_PANELS = ['activity', 'users', 'settings'];
   function switchPanel(name) {
+    if (OWNER_ONLY_PANELS.includes(name) && currentUserRole !== 'admin') {
+      name = 'overview';
+    }
     PANEL_NAMES.forEach((p) => {
       document.getElementById('panel-' + p).classList.toggle('active', p === name);
       document.getElementById('ptab-' + p).classList.toggle('active', p === name);

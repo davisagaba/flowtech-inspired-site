@@ -149,8 +149,23 @@ function requireAdmin(req, res, next) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
   req.adminUser = matched.username;
+  req.adminRole = matched.role || 'staff';
   next();
 }
+
+// Gate for admin-only actions (user management, branding/settings, deleting
+// products, viewing the audit trail). Staff accounts can run day-to-day
+// operations but not touch these. Use after requireAdmin on the same route.
+function requireOwner(req, res, next) {
+  if (req.adminRole !== 'admin') {
+    return res.status(403).json({ ok: false, error: 'This action is restricted to admin accounts.' });
+  }
+  next();
+}
+
+app.get('/admin/whoami', requireAdmin, (req, res) => {
+  res.json({ ok: true, username: req.adminUser, role: req.adminRole });
+});
 
 // --- Activity log (audit trail) ---
 const ACTIVITY_LOG = '/opt/lifestyle-ceramics/backend/activity.log';
@@ -558,7 +573,7 @@ app.put('/admin/products/:id', requireAdmin, (req, res) => {
   res.json({ ok: true, product: products[idx] });
 });
 
-app.delete('/admin/products/:id', requireAdmin, (req, res) => {
+app.delete('/admin/products/:id', requireAdmin, requireOwner, (req, res) => {
   const id = Number(req.params.id);
   const products = loadProducts();
   const removed = products.find((p) => p.id === id);
@@ -621,7 +636,7 @@ app.get('/admin/settings', requireAdmin, (req, res) => {
   res.json({ ok: true, settings: loadSettings() });
 });
 
-app.put('/admin/settings', requireAdmin, (req, res) => {
+app.put('/admin/settings', requireAdmin, requireOwner, (req, res) => {
   const settings = { ...loadSettings(), ...req.body };
   saveSettings(settings);
   logActivity(req.adminUser, 'updated_settings');
@@ -629,24 +644,24 @@ app.put('/admin/settings', requireAdmin, (req, res) => {
 });
 
 // --- Admin users (named logins) ---
-app.get('/admin/users', requireAdmin, (req, res) => {
+app.get('/admin/users', requireAdmin, requireOwner, (req, res) => {
   res.json({ ok: true, users: loadUsers().map((u) => ({ username: u.username, role: u.role })) });
 });
 
-app.post('/admin/users', requireAdmin, (req, res) => {
+app.post('/admin/users', requireAdmin, requireOwner, (req, res) => {
   const { username, password, role } = req.body || {};
   if (!username || !password) return res.status(400).json({ ok: false, error: 'Missing username or password.' });
   const users = loadUsers();
   if (users.some((u) => u.username === username)) {
     return res.status(400).json({ ok: false, error: 'Username already exists.' });
   }
-  users.push({ username, password, role: role || 'admin' });
+  users.push({ username, password, role: role || 'staff' });
   saveUsers(users);
   logActivity(req.adminUser, 'added_user', username);
   res.json({ ok: true });
 });
 
-app.delete('/admin/users/:username', requireAdmin, (req, res) => {
+app.delete('/admin/users/:username', requireAdmin, requireOwner, (req, res) => {
   const users = loadUsers();
   if (users.length <= 1) return res.status(400).json({ ok: false, error: 'Cannot delete the last remaining user.' });
   const filtered = users.filter((u) => u.username !== req.params.username);
@@ -656,7 +671,7 @@ app.delete('/admin/users/:username', requireAdmin, (req, res) => {
 });
 
 // --- Activity log (audit trail) ---
-app.get('/admin/activity', requireAdmin, (req, res) => {
+app.get('/admin/activity', requireAdmin, requireOwner, (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   res.json({ ok: true, activity: readJsonLines(ACTIVITY_LOG).reverse().slice(0, limit) });
 });
