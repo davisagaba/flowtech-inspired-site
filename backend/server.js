@@ -283,6 +283,7 @@ app.post('/quote', (req, res) => {
       const logLine = JSON.stringify({
         quoteNumber, name, email, phone, company, timeline, message, items, grandTotal, date,
         status: 'pending_review',
+        stage: 'requested',
         pdfPath: filePath,
       }) + '\n';
       fs.appendFile(LOG_PATH, logLine, () => {});
@@ -303,6 +304,33 @@ app.post('/quote', (req, res) => {
     console.error('Quote endpoint error:', err);
     res.status(500).json({ ok: false, error: 'Server error.' });
   }
+});
+
+// --- Quote pipeline (per-client workflow tracking) ---
+// Append-only log: /analytics and /admin/clients both dedupe by taking the
+// LAST entry per quoteNumber, so a patch here is simply a new line with the
+// previous entry's fields plus whatever changed.
+const QUOTE_STAGES = ['requested', 'stock_confirmed', 'quote_sent', 'invoice_sent', 'paid'];
+function getLatestQuote(quoteNumber) {
+  const requests = readJsonLines(LOG_PATH);
+  return [...requests].reverse().find((q) => q.quoteNumber === quoteNumber);
+}
+function appendQuoteUpdate(quoteNumber, patch) {
+  const quote = getLatestQuote(quoteNumber);
+  if (!quote) return null;
+  const updated = { ...quote, ...patch };
+  fs.appendFile(LOG_PATH, JSON.stringify(updated) + '\n', () => {});
+  return updated;
+}
+
+app.put('/admin/quotes/:quoteNumber/stage', requireAdmin, (req, res) => {
+  const { stage } = req.body || {};
+  if (!QUOTE_STAGES.includes(stage)) {
+    return res.status(400).json({ ok: false, error: 'Invalid stage. Must be one of: ' + QUOTE_STAGES.join(', ') });
+  }
+  const updated = appendQuoteUpdate(req.params.quoteNumber, { stage, [`${stage}At`]: new Date().toISOString() });
+  if (!updated) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+  res.json({ ok: true, quote: updated });
 });
 
 // Staff-triggered send: emails the already-generated, reviewed PDF to the
@@ -333,11 +361,7 @@ app.post('/admin/send-quote', requireAdmin, async (req, res) => {
 
     // Append a status-update log line; /analytics reads the latest entry per
     // quoteNumber last, so this marks it sent without rewriting the log.
-    fs.appendFile(
-      LOG_PATH,
-      JSON.stringify({ ...quote, status: 'sent', sentAt: new Date().toISOString() }) + '\n',
-      () => {}
-    );
+    appendQuoteUpdate(quoteNumber, { status: 'sent', stage: 'quote_sent', sentAt: new Date().toISOString() });
 
     res.json({ ok: true });
   } catch (err) {
@@ -573,8 +597,16 @@ function saveClientNotes(notes) {
 }
 
 app.get('/admin/clients', requireAdmin, (req, res) => {
-  const quotes = readJsonLines(LOG_PATH);
-  const docs = readJsonLines(DOCUMENTS_LOG);
+  // Dedupe by quoteNumber first — a quote can have multiple log lines
+  // (requested, stock confirmed, sent, etc.), only the latest matters here.
+  const quotesByNumber = new Map();
+  readJsonLines(LOG_PATH).forEach((q) => quotesByNumber.set(q.quoteNumber, q));
+  const quotes = [...quotesByNumber.values()];
+
+  const docsByNumber = new Map();
+  readJsonLines(DOCUMENTS_LOG).forEach((d) => docsByNumber.set(d.docNumber, d));
+  const docs = [...docsByNumber.values()];
+
   const notes = loadClientNotes();
   const byEmail = new Map();
 
@@ -588,7 +620,7 @@ app.get('/admin/clients', requireAdmin, (req, res) => {
       });
     }
     const c = byEmail.get(key);
-    c.quotes.push({ quoteNumber: q.quoteNumber, date: q.date, grandTotal: q.grandTotal, status: q.status });
+    c.quotes.push({ quoteNumber: q.quoteNumber, date: q.date, grandTotal: q.grandTotal, status: q.status, stage: q.stage || 'requested' });
     c.totalValue += Number(q.grandTotal) || 0;
     if (new Date(q.date) > new Date(c.lastActivity)) c.lastActivity = q.date;
     // Latest quote wins for display name/phone/company in case of updates.
@@ -773,6 +805,12 @@ app.post('/admin/documents/receipt', requireAdmin, async (req, res) => {
       date: new Date().toISOString(), status: 'issued', pdfPath: filePath,
     };
     fs.appendFile(DOCUMENTS_LOG, JSON.stringify(entry) + '\n', () => {});
+
+    // Payment recorded → advance the originating quote's pipeline stage.
+    if (invoice.refNumber) {
+      appendQuoteUpdate(invoice.refNumber, { stage: 'paid', paidAt: new Date().toISOString() });
+    }
+
     res.json({ ok: true, docNumber });
   } catch (err) {
     console.error('Receipt generation error:', err);
@@ -809,6 +847,12 @@ app.post('/admin/documents/:docNumber/send', requireAdmin, async (req, res) => {
     });
 
     fs.appendFile(DOCUMENTS_LOG, JSON.stringify({ ...doc, status: 'sent', sentAt: new Date().toISOString() }) + '\n', () => {});
+
+    // Invoice sent → advance the originating quote's pipeline stage.
+    if (doc.type === 'invoice' && doc.refNumber) {
+      appendQuoteUpdate(doc.refNumber, { stage: 'invoice_sent', invoice_sentAt: new Date().toISOString() });
+    }
+
     res.json({ ok: true });
   } catch (err) {
     console.error('Document send error:', err);

@@ -24,6 +24,12 @@
   th { background: #f8f8f7; font-weight: 700; }
   .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fde9a8; color: #7a5b00; }
   .pill.done { background: #d6f0e0; color: #0d5559; }
+  .stage-stepper { display: flex; align-items: center; flex-wrap: wrap; gap: 0; font-size: 11px; }
+  .stage-step { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 999px; color: #9a9d9f; background: #f3f4f2; white-space: nowrap; }
+  .stage-step.done { color: #0d5559; background: #d6f0e0; font-weight: 700; }
+  .stage-step.current { color: #fff; background: #0d5559; font-weight: 700; }
+  .stage-arrow { color: #ccc; margin: 0 2px; font-size: 10px; }
+  .stage-select { margin-top: 6px; padding: 5px 8px; border: 1px solid #e2e4e1; border-radius: 8px; font-family: inherit; font-size: 12px; }
   section { margin-bottom: 32px; }
   #app { display: none; }
   .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -182,7 +188,7 @@
       <section>
         <h2 style="font-size:16px;">Quote Requests</h2>
         <table id="quotes-table">
-          <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
+          <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Pipeline Stage</th><th>Action</th></tr></thead>
           <tbody></tbody>
         </table>
       </section>
@@ -375,6 +381,40 @@
     return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n || 0);
   }
 
+  // ---------- Quote pipeline (per-client workflow tracking) ----------
+  const QUOTE_STAGES = [
+    { key: 'requested', label: 'Requested' },
+    { key: 'stock_confirmed', label: 'Stock Confirmed' },
+    { key: 'quote_sent', label: 'Quote Sent' },
+    { key: 'invoice_sent', label: 'Invoice Sent' },
+    { key: 'paid', label: 'Paid' },
+  ];
+
+  function stageStepperHtml(currentStage) {
+    const idx = Math.max(0, QUOTE_STAGES.findIndex((s) => s.key === (currentStage || 'requested')));
+    return QUOTE_STAGES.map((s, i) => {
+      const cls = i < idx ? 'done' : i === idx ? 'current' : '';
+      const arrow = i < QUOTE_STAGES.length - 1 ? '<span class="stage-arrow">→</span>' : '';
+      return `<span class="stage-step ${cls}">${s.label}</span>${arrow}`;
+    }).join('');
+  }
+
+  function setQuoteStage(quoteNumber, stage) {
+    if (!stage) return;
+    fetch('/api/admin/quotes/' + quoteNumber + '/stage?password=' + encodeURIComponent(adminPw()), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        showMailToast('Moved to ' + QUOTE_STAGES.find((s) => s.key === stage).label + '.');
+        refreshAnalytics();
+      })
+      .catch((err) => alert('Could not update stage: ' + err.message));
+  }
+
   // Products are stored as a GBP base price; the storefront applies this
   // same markup+VAT (formatPrice in catalog.js) to show the final ZAR price.
   const GBP_TO_ZAR_RATE = 24;
@@ -401,6 +441,12 @@
       .catch(() => {
         document.getElementById('login-error').textContent = 'Incorrect password.';
       });
+  }
+
+  function refreshAnalytics() {
+    fetch('/api/analytics?password=' + encodeURIComponent(adminPw()), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => { if (data.ok) render(data); });
   }
 
   // ---------- Product management ----------
@@ -568,7 +614,13 @@
         <td>${q.phone || ''}</td>
         <td>${(q.items || []).map((it) => it.name + ' x' + it.qty).join(', ')}</td>
         <td>${fmtZAR(q.grandTotal)}</td>
-        <td><span class="pill ${q.status === 'pending_review' ? '' : 'done'}">${q.status || 'received'}</span></td>
+        <td>
+          <div class="stage-stepper">${stageStepperHtml(q.stage)}</div>
+          <select class="stage-select" onchange="setQuoteStage('${q.quoteNumber}', this.value)">
+            <option value="">Move to…</option>
+            ${QUOTE_STAGES.map((s) => `<option value="${s.key}">${s.label}</option>`).join('')}
+          </select>
+        </td>
         <td>
           ${q.status === 'sent'
             ? '<span class="muted">Sent</span>'
@@ -999,7 +1051,11 @@
         Total value: ${fmtZAR(c.totalValue)} across ${c.quotes.length} quote(s)
       </div>
       <h4 style="margin-bottom:6px;">Quote History</h4>
-      ${c.quotes.map((q) => `<div style="font-size:13px;margin-bottom:4px;">${q.quoteNumber} — ${fmtZAR(q.grandTotal)} — <span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status || 'received'}</span></div>`).join('') || '<p class="muted">None</p>'}
+      ${c.quotes.map((q) => `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:13px;margin-bottom:4px;">${q.quoteNumber} — ${fmtZAR(q.grandTotal)}</div>
+          <div class="stage-stepper">${stageStepperHtml(q.stage)}</div>
+        </div>`).join('') || '<p class="muted">None</p>'}
       ${c.documents.length ? `<h4 style="margin:14px 0 6px;">Documents</h4>${c.documents.map((d) => `<div style="font-size:13px;margin-bottom:4px;">${d.docNumber} (${d.type}) — ${fmtZAR(d.total)}</div>`).join('')}` : ''}
       <h4 style="margin:14px 0 6px;">Notes</h4>
       <textarea id="client-notes" style="width:100%;min-height:80px;padding:8px;border:1px solid #e2e4e1;border-radius:10px;font-family:inherit;font-size:13px;">${c.notes || ''}</textarea>
