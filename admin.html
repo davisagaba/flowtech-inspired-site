@@ -596,6 +596,7 @@
   <div class="modal">
     <h3 id="compose-modal-title">Compose Email</h3>
     <input type="hidden" id="c-in-reply-to">
+    <input type="hidden" id="c-formal-quote-id">
     <div class="form-row">
       <label>To</label>
       <input type="email" id="c-to" placeholder="customer@example.com">
@@ -611,6 +612,10 @@
     <div class="form-row">
       <label>Message</label>
       <textarea id="c-body" style="min-height:180px;" placeholder="Write your message…"></textarea>
+    </div>
+    <div class="form-row" id="c-attachments-row" style="display:none;">
+      <label>Attachments (included automatically)</label>
+      <div class="attach-chips" id="c-attachments-list"></div>
     </div>
     <p class="muted" id="compose-status"></p>
     <div class="modal-actions">
@@ -1497,9 +1502,40 @@
 
   function closeCompose() {
     document.getElementById('compose-modal').classList.remove('open');
+    document.getElementById('c-formal-quote-id').value = '';
+    document.getElementById('c-attachments-row').style.display = 'none';
+  }
+
+  // Opens the compose window pre-filled with the quotation's default email,
+  // so staff can review/edit before anything actually sends — the quotation
+  // PDF and any matching product spec sheets are attached automatically.
+  function openSendFormalQuoteCompose(id) {
+    fetch('/api/admin/formal-quotes/' + id + '/email-preview?' + authQS())
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Could not load email preview.');
+        document.getElementById('compose-modal-title').textContent = 'Send Quotation';
+        document.getElementById('c-in-reply-to').value = '';
+        document.getElementById('c-formal-quote-id').value = id;
+        document.getElementById('c-to').value = data.to || '';
+        document.getElementById('c-cc').value = '';
+        document.getElementById('c-subject').value = data.subject || '';
+        document.getElementById('c-body').value = data.body || '';
+        document.getElementById('compose-status').textContent = '';
+
+        const attachments = [data.pdfAttachment, ...(data.specAttachments || [])].filter(Boolean);
+        document.getElementById('c-attachments-row').style.display = attachments.length ? '' : 'none';
+        document.getElementById('c-attachments-list').innerHTML = attachments.map((a) =>
+          `<span class="attach-chip">📎 ${a.label || a.filename}</span>`
+        ).join('');
+
+        document.getElementById('compose-modal').classList.add('open');
+      })
+      .catch((err) => alert('Could not open quotation for sending: ' + err.message));
   }
 
   function sendCompose() {
+    const formalQuoteId = document.getElementById('c-formal-quote-id').value;
     const to = document.getElementById('c-to').value.trim();
     const cc = document.getElementById('c-cc').value.trim();
     const subject = document.getElementById('c-subject').value.trim();
@@ -1511,17 +1547,30 @@
     }
     const status = document.getElementById('compose-status');
     status.textContent = 'Sending…';
-    fetch('/api/admin/mailbox/send?' + authQS(), {
+
+    const url = formalQuoteId
+      ? '/api/admin/formal-quotes/' + formalQuoteId + '/send?' + authQS()
+      : '/api/admin/mailbox/send?' + authQS();
+    const payload = formalQuoteId
+      ? { subject, body }
+      : { to, cc: cc || undefined, subject, body, inReplyTo };
+
+    fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, cc: cc || undefined, subject, body, inReplyTo }),
+      body: JSON.stringify(payload),
     })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Send failed');
         closeCompose();
-        showMailToast('Email sent — check the Outbox tab to see it.');
-        if (currentMailFolder === 'outbox') loadMail('outbox');
+        if (formalQuoteId) {
+          showMailToast('Quotation sent to client.');
+          loadFormalQuotes();
+        } else {
+          showMailToast('Email sent — check the Outbox tab to see it.');
+          if (currentMailFolder === 'outbox') loadMail('outbox');
+        }
       })
       .catch((err) => {
         status.textContent = 'Error: ' + err.message;
@@ -1720,7 +1769,7 @@
               ${canIssue ? `<button class="btn-outline-sm" onclick="issueFormalQuote(${q.id}, this)">Issue PDF</button>` : ''}
               ${q.pdfPath ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/view?${authQS()}" target="_blank">View</a>` : ''}
               ${q.pdfPath ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/pdf?${authQS()}" target="_blank">Download</a>` : ''}
-              ${canSend ? `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendFormalQuote(${q.id}, this)">Send</button>` : ''}
+              ${canSend ? `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="openSendFormalQuoteCompose(${q.id})">Send</button>` : ''}
               ${q.status !== 'void' ? `<button class="btn-danger-sm" onclick="removeFormalQuote(${q.id})">${q.status === 'draft' ? 'Delete' : 'Void'}</button>` : ''}
             </td>
           </tr>`;

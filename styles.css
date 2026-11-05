@@ -586,6 +586,12 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
   margin-bottom: 10px;
 }
 .footer-col a:hover { color: #fff; }
+.footer-address {
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
 .social-links { display: flex; flex-direction: row; gap: 10px; flex-wrap: wrap; }
 .social-links a {
   display: flex;

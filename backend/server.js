@@ -405,6 +405,30 @@ app.post('/quote', (req, res) => {
     }) + '\n';
     fs.appendFile(LOG_PATH, logLine, () => {});
 
+    // Alert staff immediately — fire-and-forget so a slow/failed email never
+    // delays or breaks the customer's confirmation response.
+    const settings = loadSettings();
+    mailer.sendMail({
+      from: `"${settings.legalName || settings.companyName} Website" <${process.env.LSC_SMTP_USER}>`,
+      to: process.env.LSC_SMTP_USER,
+      subject: `New Quote Request from ${name} (${quoteNumber})`,
+      text: [
+        `A new quote request just came in from the website.`,
+        '',
+        `Name: ${name}`,
+        `Email: ${email}`,
+        phone ? `Phone: ${phone}` : null,
+        company ? `Company: ${company}` : null,
+        '',
+        'Items:',
+        ...items.map((it) => `- ${it.name} x${it.qty} (${formatZAR(Number(it.lineTotal) || 0)})`),
+        '',
+        `Total: ${formatZAR(grandTotal)}`,
+        '',
+        `A matching draft quotation has already been created — open it from the admin panel's Quotes tab ("Open Formal Quote") to review and issue it.`,
+      ].filter(Boolean).join('\n'),
+    }).catch((err) => console.warn('Quote-request staff alert failed:', err.message));
+
     res.json({ ok: true, quoteNumber });
   } catch (err) {
     console.error('Quote endpoint error:', err);
@@ -1942,6 +1966,75 @@ app.get('/admin/formal-quotes/:id/preview', requireAdmin, async (req, res) => {
   }
 });
 
+// Builds the default subject/body/attachments for a formal quote's send
+// email — shared by the preview endpoint (what the compose window shows)
+// and the actual send endpoint (if the caller didn't override them).
+function buildQuotationEmail(quote) {
+  const settings = loadSettings();
+  const operatorName = settings.documentOperatorName || 'Sales Team';
+  const body = [
+    `Dear ${quote.customerName},`,
+    '',
+    'Please find attached our quotation for your review, including pricing and estimated delivery timelines.',
+    '',
+    'Please note:',
+    ...(settings.deliveryTerms || '').split('\n').map((line) => `- ${line}`),
+    '',
+    "Should you require any clarification or wish to make adjustments, please don't hesitate to get in touch — we're happy to assist.",
+    '',
+    'We look forward to your feedback and the opportunity to work with you.',
+    '',
+    'Kind regards,',
+    '',
+    operatorName,
+    settings.salesRepTitle || '',
+    settings.legalName,
+    '',
+    `Mobile: ${settings.whatsappNumber}`,
+    `Email: ${process.env.LSC_SMTP_USER}`,
+    `Website: ${settings.website}`,
+    '',
+    `This quotation is valid for 30 days from the date of issue and is subject to our standard terms and conditions of sale.`,
+  ].join('\n');
+
+  const catalogProducts = loadProducts();
+  const specAttachments = [];
+  const seenSpecPaths = new Set();
+  (quote.items || []).forEach((item) => {
+    const product = catalogProducts.find((p) => p.code && item.code && p.code === item.code);
+    if (product && product.specSheet) {
+      const specPath = path.join(PUBLIC_DIR, product.specSheet.replace(/^\//, ''));
+      if (!seenSpecPaths.has(specPath) && fs.existsSync(specPath)) {
+        seenSpecPaths.add(specPath);
+        specAttachments.push({
+          filename: `${product.name.replace(/[^a-z0-9]+/gi, '-')}-Specification.pdf`,
+          path: specPath,
+          label: `${product.name} — Specification Sheet`,
+        });
+      }
+    }
+  });
+
+  return {
+    to: quote.customerEmail,
+    subject: `Your Quotation ${quote.docNumber} — ${settings.legalName}`,
+    body,
+    pdfAttachment: { filename: path.basename(quote.pdfPath), label: 'Quotation PDF' },
+    specAttachments,
+  };
+}
+
+// Returns the default email contents without sending — used to pre-fill the
+// compose window so staff can review/edit before anything goes out.
+app.get('/admin/formal-quotes/:id/email-preview', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const quote = loadFormalDocs().find((d) => d.id === id);
+  if (!quote) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+  if (!quote.pdfPath) return res.status(400).json({ ok: false, error: 'Issue the quote first.' });
+  const email = buildQuotationEmail(quote);
+  res.json({ ok: true, ...email });
+});
+
 app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -1956,56 +2049,18 @@ app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'This quote has no customer email on file.' });
     }
     const settings = loadSettings();
-    const operatorName = settings.documentOperatorName || 'Sales Team';
-    const emailBody = [
-      `Dear ${quote.customerName},`,
-      '',
-      'Please find attached our quotation for your review, including pricing and estimated delivery timelines.',
-      '',
-      'Please note:',
-      ...(settings.deliveryTerms || '').split('\n').map((line) => `- ${line}`),
-      '',
-      "Should you require any clarification or wish to make adjustments, please don't hesitate to get in touch — we're happy to assist.",
-      '',
-      'We look forward to your feedback and the opportunity to work with you.',
-      '',
-      'Kind regards,',
-      '',
-      operatorName,
-      settings.salesRepTitle || '',
-      settings.legalName,
-      '',
-      `Mobile: ${settings.whatsappNumber}`,
-      `Email: ${process.env.LSC_SMTP_USER}`,
-      `Website: ${settings.website}`,
-      '',
-      `This quotation is valid for 30 days from the date of issue and is subject to our standard terms and conditions of sale.`,
-    ].join('\n');
-
-    // Auto-attach each line item's product spec sheet (matched by code),
-    // alongside the quotation PDF itself.
-    const catalogProducts = loadProducts();
-    const specAttachments = [];
-    const seenSpecPaths = new Set();
-    (quote.items || []).forEach((item) => {
-      const product = catalogProducts.find((p) => p.code && item.code && p.code === item.code);
-      if (product && product.specSheet) {
-        const specPath = path.join(PUBLIC_DIR, product.specSheet.replace(/^\//, ''));
-        if (!seenSpecPaths.has(specPath) && fs.existsSync(specPath)) {
-          seenSpecPaths.add(specPath);
-          specAttachments.push({ filename: `${product.name.replace(/[^a-z0-9]+/gi, '-')}-Specification.pdf`, path: specPath });
-        }
-      }
-    });
+    const defaults = buildQuotationEmail(quote);
+    const subject = req.body && req.body.subject ? req.body.subject : defaults.subject;
+    const emailBody = req.body && req.body.body ? req.body.body : defaults.body;
 
     await mailer.sendMail({
       from: `"${settings.legalName}" <${process.env.LSC_SMTP_USER}>`,
       to: quote.customerEmail,
-      subject: `Your Quotation ${quote.docNumber} — ${settings.legalName}`,
+      subject,
       text: emailBody,
       attachments: [
         { filename: path.basename(quote.pdfPath), path: quote.pdfPath },
-        ...specAttachments,
+        ...defaults.specAttachments,
       ],
     });
 

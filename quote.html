@@ -110,8 +110,8 @@
             <table class="specs-table" id="quote-items-table"></table>
             <p class="quote-items-total" id="quote-items-total"></p>
           </div>
-          <label id="qproduct-fallback-wrap" hidden>Product
-            <input type="text" id="qproduct" placeholder="e.g. Plural Urinal">
+          <label id="qproduct-fallback-wrap" hidden>Product / items you need a quote for
+            <input type="text" id="qproduct" placeholder="e.g. Plural Urinal x2, hand dryer x1" required>
           </label>
           <label>When do you need this by?
             <select id="qtimeline">
@@ -164,6 +164,7 @@
     </div>
     <div class="footer-col">
       <h4>Contact</h4>
+      <p class="footer-address">118 Strand Street, Cape Town, Western Cape, South Africa</p>
       <a href="tel:+27871470677">+27 87 147 0677</a>
       <a href="https://wa.me/27780316138" target="_blank" rel="noopener">+27 78 031 6138 (WhatsApp)</a>
     </div>
@@ -252,9 +253,17 @@
   document.getElementById('quote-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('qname').value;
+    const qproductInput = document.getElementById('qproduct');
+    if (quoteItems.length === 0 && !qproductInput.value.trim()) {
+      qproductInput.focus();
+      qproductInput.reportValidity && qproductInput.setCustomValidity('Please tell us which product(s) you need a quote for.');
+      qproductInput.reportValidity();
+      qproductInput.setCustomValidity('');
+      return;
+    }
     const productSummary = quoteItems.length > 0
       ? quoteItems.map(({ qty, product }) => `${product.name} x${qty}`).join(', ')
-      : (document.getElementById('qproduct').value || 'your selected products');
+      : qproductInput.value.trim();
 
     const payloadItems = quoteItems.length > 0
       ? quoteItems.map(({ qty, product }) => {
