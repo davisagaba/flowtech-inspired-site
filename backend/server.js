@@ -294,7 +294,11 @@ app.get('/analytics', requireAdmin, (req, res) => {
   // latest entry per quoteNumber so the dashboard shows current status.
   const quotesByNumber = new Map();
   readJsonLines(LOG_PATH).forEach((q) => quotesByNumber.set(q.quoteNumber, q));
-  const quotes = [...quotesByNumber.values()];
+  const formalDocsById = new Map(loadFormalDocs().map((d) => [d.id, d]));
+  const quotes = [...quotesByNumber.values()].map((q) => {
+    const formalDoc = q.formalQuoteId ? formalDocsById.get(q.formalQuoteId) : null;
+    return { ...q, emailOpenedAt: formalDoc ? formalDoc.emailOpenedAt || null : null };
+  });
 
   const now = Date.now();
   const since = (days) => now - days * 24 * 60 * 60 * 1000;
@@ -340,6 +344,27 @@ function nextQuoteNumber() {
 function formatZAR(n) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 }
+
+// 1x1 transparent GIF used as an email open-tracking pixel. Public and
+// unauthenticated — it's loaded directly by the recipient's mail client.
+const TRACKING_PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7', 'base64');
+app.get('/track/open/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  res.set('Content-Type', 'image/gif');
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  try {
+    const docs = loadFormalDocs();
+    const idx = docs.findIndex((d) => d.id === id);
+    if (idx !== -1) {
+      if (!docs[idx].emailOpenedAt) docs[idx].emailOpenedAt = new Date().toISOString();
+      docs[idx].emailOpenCount = (docs[idx].emailOpenCount || 0) + 1;
+      saveFormalDocs(docs);
+    }
+  } catch {
+    /* tracking must never break the pixel response */
+  }
+  res.end(TRACKING_PIXEL);
+});
 
 app.post('/quote', (req, res) => {
   try {
@@ -2093,11 +2118,20 @@ app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
     const subject = req.body && req.body.subject ? req.body.subject : defaults.subject;
     const emailBody = req.body && req.body.body ? req.body.body : defaults.body;
 
+    // Plain-text body plus an HTML version carrying an invisible open-
+    // tracking pixel, so staff can see in the admin when a client has
+    // actually opened the quotation email.
+    const trackingPixelUrl = `https://lyfestyleceramics.co.za/api/track/open/${quote.id}`;
+    const htmlBody = emailBody
+      .split('\n').map((line) => line || '<br>').join('<br>')
+      + `<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:none;">`;
+
     const mailOptions = {
       from: `"${settings.legalName}" <${process.env.LSC_SMTP_USER}>`,
       to: quote.customerEmail,
       subject,
       text: emailBody,
+      html: htmlBody,
       attachments: [
         { filename: path.basename(quote.pdfPath), path: quote.pdfPath },
         ...defaults.specAttachments,
