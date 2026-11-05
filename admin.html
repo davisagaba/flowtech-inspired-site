@@ -1561,6 +1561,21 @@
         cancelInlineReply();
         status.textContent = '';
         showMailToast('Reply sent — check the Outbox tab to see it.');
+        // Belt-and-suspenders: the original message should already be
+        // marked read from opening it, but replying always counts as
+        // handled, so force it here too in case that earlier call ever
+        // silently failed — the unread badge must reflect it either way.
+        if (!m.seen) {
+          fetch('/api/admin/mailbox/mark-read?' + authQS(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: 'INBOX', uid: m.uid }),
+          }).then(() => {
+            m.seen = true;
+            updateUnreadBadge();
+            renderMailList();
+          }).catch(() => {});
+        }
       })
       .catch((err) => {
         status.textContent = 'Error: ' + err.message;
