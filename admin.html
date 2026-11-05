@@ -675,6 +675,13 @@
       <p class="muted" id="upload-status" style="margin:4px 0 0;"></p>
       <div class="image-list" id="p-image-list"></div>
     </div>
+    <div class="form-row">
+      <label>Specification Sheet PDF (optional)</label>
+      <input type="file" id="p-spec-upload" accept="application/pdf" onchange="uploadProductSpecSheet(this)">
+      <p class="muted" id="spec-upload-status" style="margin:4px 0 0;">Auto-attached to this product's line items when a quotation is sent.</p>
+      <div id="p-spec-current" style="margin-top:6px;"></div>
+      <input type="hidden" id="p-specSheet">
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeProductForm()">Cancel</button>
       <button class="btn" onclick="saveProduct()">Save Product</button>
@@ -863,6 +870,37 @@
       });
   }
 
+  function uploadProductSpecSheet(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const status = document.getElementById('spec-upload-status');
+    status.textContent = 'Uploading...';
+    const formData = new FormData();
+    formData.append('specSheet', file);
+    fetch('/api/admin/upload-spec-sheet?' + authQS(), {
+      method: 'POST',
+      body: formData,
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Upload failed');
+        document.getElementById('p-specSheet').value = data.url;
+        renderSpecSheetStatus(data.url);
+        status.textContent = 'Uploaded — attached automatically to quotation emails.';
+        input.value = '';
+      })
+      .catch((err) => {
+        status.textContent = 'Error: ' + err.message;
+      });
+  }
+
+  function renderSpecSheetStatus(url) {
+    const el = document.getElementById('p-spec-current');
+    el.innerHTML = url
+      ? `<a href="${url}" target="_blank" class="attach-chip" style="text-decoration:none;">📄 Current spec sheet<button type="button" onclick="document.getElementById('p-specSheet').value='';renderSpecSheetStatus('')">×</button></a>`
+      : '';
+  }
+
   function openProductForm(id) {
     const p = id ? currentProducts.find((x) => x.id === id) : null;
     document.getElementById('product-modal-title').textContent = p ? 'Edit Product' : 'Add Product';
@@ -876,6 +914,9 @@
     document.getElementById('p-size').value = p ? p.size || '' : '';
     document.getElementById('p-power').value = p ? p.power || '' : '';
     document.getElementById('p-desc').value = p ? p.desc || '' : '';
+    document.getElementById('p-specSheet').value = p ? p.specSheet || '' : '';
+    document.getElementById('spec-upload-status').textContent = 'Auto-attached to this product\'s line items when a quotation is sent.';
+    renderSpecSheetStatus(p ? p.specSheet : '');
     currentImages = p && p.images ? [...p.images] : [];
     renderImageList();
     document.getElementById('product-modal').classList.add('open');
@@ -898,6 +939,7 @@
       power: document.getElementById('p-power').value.trim(),
       desc: document.getElementById('p-desc').value.trim(),
       images: currentImages,
+      specSheet: document.getElementById('p-specSheet').value || '',
     };
     if (!payload.name) { alert('Product name is required.'); return; }
 

@@ -1451,6 +1451,28 @@ app.post('/admin/upload-image', requireAdmin, upload.single('image'), (req, res)
   res.json({ ok: true, url: `/uploads/products/${req.file.filename}` });
 });
 
+// Per-product spec sheet PDFs — attached automatically to quotation emails
+// for any line item whose code matches the product.
+const SPEC_SHEETS_DIR = path.join(PUBLIC_DIR, 'uploads', 'spec-sheets');
+if (!fs.existsSync(SPEC_SHEETS_DIR)) fs.mkdirSync(SPEC_SHEETS_DIR, { recursive: true });
+
+const uploadSpecSheet = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, SPEC_SHEETS_DIR),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.pdf`),
+  }),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') return cb(new Error('Only PDF files are allowed.'));
+    cb(null, true);
+  },
+});
+
+app.post('/admin/upload-spec-sheet', requireAdmin, uploadSpecSheet.single('specSheet'), (req, res) => {
+  if (!req.file) return res.status(400).json({ ok: false, error: 'No file uploaded.' });
+  res.json({ ok: true, url: `/uploads/spec-sheets/${req.file.filename}` });
+});
+
 const uploadAttachment = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, MAIL_ATTACHMENTS_DIR),
@@ -1960,12 +1982,31 @@ app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
       `This quotation is valid for 30 days from the date of issue and is subject to our standard terms and conditions of sale.`,
     ].join('\n');
 
+    // Auto-attach each line item's product spec sheet (matched by code),
+    // alongside the quotation PDF itself.
+    const catalogProducts = loadProducts();
+    const specAttachments = [];
+    const seenSpecPaths = new Set();
+    (quote.items || []).forEach((item) => {
+      const product = catalogProducts.find((p) => p.code && item.code && p.code === item.code);
+      if (product && product.specSheet) {
+        const specPath = path.join(PUBLIC_DIR, product.specSheet.replace(/^\//, ''));
+        if (!seenSpecPaths.has(specPath) && fs.existsSync(specPath)) {
+          seenSpecPaths.add(specPath);
+          specAttachments.push({ filename: `${product.name.replace(/[^a-z0-9]+/gi, '-')}-Specification.pdf`, path: specPath });
+        }
+      }
+    });
+
     await mailer.sendMail({
       from: `"${settings.legalName}" <${process.env.LSC_SMTP_USER}>`,
       to: quote.customerEmail,
       subject: `Your Quotation ${quote.docNumber} — ${settings.legalName}`,
       text: emailBody,
-      attachments: [{ filename: path.basename(quote.pdfPath), path: quote.pdfPath }],
+      attachments: [
+        { filename: path.basename(quote.pdfPath), path: quote.pdfPath },
+        ...specAttachments,
+      ],
     });
 
     quote.status = 'sent';
