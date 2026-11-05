@@ -1021,6 +1021,11 @@ function buildQuotationPdf(quote) {
   doc.fontSize(24).font('Helvetica-Bold').fillColor('#000').text('Quotation', MARGIN, y);
   doc.fontSize(11).font('Helvetica-Bold').text('Document Number:', MARGIN + 260, y + 6, { continued: true })
     .font('Helvetica').text(`  ${quote.docNumber}`);
+  if (quote.replacesDocNumber) {
+    doc.fontSize(8).font('Helvetica-Oblique').fillColor('#555')
+      .text(`Replaces voided quotation ${quote.replacesDocNumber}`, MARGIN + 260, doc.y + 2);
+    doc.fillColor('#000');
+  }
   y = doc.y + 14;
 
   // ---- Bill To (left) + Info box (right) ----
@@ -1842,6 +1847,7 @@ app.post('/admin/formal-quotes', requireAdmin, (req, res) => {
   const docs = loadFormalDocs();
   const nextId = docs.reduce((max, d) => Math.max(max, d.id || 0), 0) + 1;
   const totalWeight = b.items.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 0), 0);
+  const parentDoc = b.parentDocumentId ? docs.find((d) => d.id === Number(b.parentDocumentId)) : null;
 
   const quote = {
     id: nextId,
@@ -1849,7 +1855,8 @@ app.post('/admin/formal-quotes', requireAdmin, (req, res) => {
     status: 'draft',
     docNumber: null,
     revision: 0,
-    parentDocumentId: b.parentDocumentId || null,
+    parentDocumentId: parentDoc ? parentDoc.id : null,
+    replacesDocNumber: parentDoc ? (parentDoc.docNumber || `#${parentDoc.id}`) : null,
     date: new Date().toISOString().slice(0, 10),
     customerName: b.customerName,
     customerCompany: b.customerCompany || '',

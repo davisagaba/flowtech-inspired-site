@@ -483,6 +483,8 @@
   <div class="modal" style="max-width:720px;">
     <h3 id="fq-modal-title">New Quotation</h3>
     <input type="hidden" id="fq-id">
+    <input type="hidden" id="fq-parentId">
+    <p class="muted" id="fq-parent-note" style="display:none;"></p>
     <div class="form-grid-2">
       <div class="form-row"><label>Customer Name *</label><input type="text" id="fq-customerName"></div>
       <div class="form-row"><label>Company Name</label><input type="text" id="fq-customerCompany"></div>
@@ -1796,8 +1798,10 @@
           const canEdit = q.status === 'draft';
           const canIssue = q.status === 'draft';
           const canSend = q.status === 'issued';
+          const replacedBy = currentFormalQuotes.find((x) => x.parentDocumentId === q.id);
+          const replaces = q.parentDocumentId ? currentFormalQuotes.find((x) => x.id === q.parentDocumentId) : null;
           return `<tr>
-            <td>${q.docNumber || '(unissued draft)'}</td>
+            <td>${q.docNumber || '(unissued draft)'}${replaces ? `<br><span class="muted" style="font-size:11px;">replaces ${replaces.docNumber || '#' + replaces.id}</span>` : ''}${replacedBy ? `<br><span class="muted" style="font-size:11px;">replaced by ${replacedBy.docNumber || '#' + replacedBy.id}</span>` : ''}</td>
             <td>${q.customerName}${q.customerCompany ? '<br><span class="muted">' + q.customerCompany + '</span>' : ''}</td>
             <td>${q.date}</td>
             <td>${total}</td>
@@ -1810,6 +1814,7 @@
               ${q.pdfPath ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/view?${authQS()}" target="_blank">View</a>` : ''}
               ${q.pdfPath ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/pdf?${authQS()}" target="_blank">Download</a>` : ''}
               ${canSend ? `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="openSendFormalQuoteCompose(${q.id})">Send</button>` : ''}
+              ${q.status === 'void' && !replacedBy ? `<button class="btn-outline-sm" onclick="reissueFormalQuote(${q.id})">Reissue</button>` : ''}
               ${q.status !== 'void' ? `<button class="btn-danger-sm" onclick="removeFormalQuote(${q.id})">${q.status === 'draft' ? 'Delete' : 'Void'}</button>` : ''}
             </td>
           </tr>`;
@@ -1849,28 +1854,42 @@
     }).filter((it) => it.description || it.code);
   }
 
-  function openFormalQuoteForm(id) {
+  function openFormalQuoteForm(id, replacesVoidId) {
     const q = id ? currentFormalQuotes.find((x) => x.id === id) : null;
+    const replaces = replacesVoidId ? currentFormalQuotes.find((x) => x.id === replacesVoidId) : null;
     document.getElementById('fq-modal-title').textContent = q ? 'Edit Quotation (draft)' : 'New Quotation';
     document.getElementById('fq-id').value = q ? q.id : '';
-    document.getElementById('fq-customerName').value = q ? q.customerName : '';
-    document.getElementById('fq-customerCompany').value = q ? q.customerCompany : '';
-    document.getElementById('fq-customerPhone').value = q ? q.customerPhone : '';
-    document.getElementById('fq-customerEmail').value = q ? q.customerEmail : '';
-    document.getElementById('fq-account').value = q ? q.account : '';
-    document.getElementById('fq-customerVatNo').value = q ? q.customerVatNo : '';
-    document.getElementById('fq-refNo').value = q ? q.refNo : '';
-    document.getElementById('fq-accountRep').value = q ? q.accountRep : '';
-    document.getElementById('fq-discountRate').value = q ? q.discountRate : 0;
+    document.getElementById('fq-parentId').value = replaces ? replaces.id : '';
+    const parentNote = document.getElementById('fq-parent-note');
+    if (replaces) {
+      parentNote.textContent = `Replacing voided quote ${replaces.docNumber || '#' + replaces.id} — that number stays void; this draft will get the next number when issued.`;
+      parentNote.style.display = '';
+    } else {
+      parentNote.style.display = 'none';
+    }
+    const src = q || replaces;
+    document.getElementById('fq-customerName').value = src ? src.customerName : '';
+    document.getElementById('fq-customerCompany').value = src ? src.customerCompany : '';
+    document.getElementById('fq-customerPhone').value = src ? src.customerPhone : '';
+    document.getElementById('fq-customerEmail').value = src ? src.customerEmail : '';
+    document.getElementById('fq-account').value = src ? src.account : '';
+    document.getElementById('fq-customerVatNo').value = src ? src.customerVatNo : '';
+    document.getElementById('fq-refNo').value = src ? src.refNo : '';
+    document.getElementById('fq-accountRep').value = src ? src.accountRep : '';
+    document.getElementById('fq-discountRate').value = src ? src.discountRate : 0;
     document.getElementById('fq-items-tbody').innerHTML = '';
     fqItemRowCount = 0;
-    if (q && q.items && q.items.length) {
-      q.items.forEach((it) => addFormalQuoteItemRow(it));
+    if (src && src.items && src.items.length) {
+      src.items.forEach((it) => addFormalQuoteItemRow(it));
     } else {
       addFormalQuoteItemRow();
     }
     document.getElementById('formal-quote-status').textContent = '';
     document.getElementById('formal-quote-modal').classList.add('open');
+  }
+
+  function reissueFormalQuote(voidId) {
+    openFormalQuoteForm(null, voidId);
   }
 
   function closeFormalQuoteForm() {
@@ -1932,6 +1951,10 @@
       discountRate: Number(document.getElementById('fq-discountRate').value) || 0,
       items: collectFormalQuoteItems(),
     };
+    if (!id) {
+      const parentId = document.getElementById('fq-parentId').value;
+      if (parentId) payload.parentDocumentId = Number(parentId);
+    }
     if (!payload.customerName || payload.items.length === 0) {
       document.getElementById('formal-quote-status').textContent = 'Customer name and at least one line item are required.';
       return;
