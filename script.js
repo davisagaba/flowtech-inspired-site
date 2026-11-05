@@ -67,10 +67,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = 'quote.html';
   });
 
-  // WhatsApp floating button — links straight to a real chat
+  // WhatsApp floating button — links straight to a real chat, with a
+  // pre-filled greeting so visitors don't have to type one from scratch.
   if (!document.querySelector('.whatsapp-float')) {
     const btn = document.createElement('a');
-    btn.href = 'https://wa.me/27780316138';
+    const pageTitle = document.title.split('|')[0].trim();
+    const greeting = `Hi, I'm on the ${pageTitle} page and I'd like to find out more.`;
+    btn.href = 'https://wa.me/27780316138?text=' + encodeURIComponent(greeting);
     btn.target = '_blank';
     btn.rel = 'noopener';
     btn.className = 'whatsapp-float';
