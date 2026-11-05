@@ -348,47 +348,53 @@
 
     let result = null;
     try {
-      const res = await fetch('/api/quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          email: document.getElementById('qemail').value,
-          phone: document.getElementById('qphone').value,
-          company: document.getElementById('qcompany').value,
-          timeline: document.getElementById('qtimeline').value,
-          message: document.getElementById('qmessage').value,
-          items: payloadItems,
-        }),
-      });
-      if (res.ok) result = await res.json();
-    } catch {
-      /* network error — handled below via result === null */
-    }
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch('/api/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            name,
+            email: document.getElementById('qemail').value,
+            phone: document.getElementById('qphone').value,
+            company: document.getElementById('qcompany').value,
+            timeline: document.getElementById('qtimeline').value,
+            message: document.getElementById('qmessage').value,
+            items: payloadItems,
+          }),
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) result = await res.json();
+      } catch {
+        /* network error or 15s timeout — handled below via result === null */
+      }
 
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Submit Quote Request';
+      document.getElementById('success-name').textContent = name;
+      document.getElementById('success-product').textContent = productSummary;
+      document.getElementById('quote-fields').hidden = true;
+      document.getElementById('quote-success').hidden = false;
 
-    document.getElementById('success-name').textContent = name;
-    document.getElementById('success-product').textContent = productSummary;
-    document.getElementById('quote-fields').hidden = true;
-    document.getElementById('quote-success').hidden = false;
-
-    const actions = document.getElementById('success-actions');
-    if (result && result.ok) {
-      document.getElementById('success-heading').textContent = 'Request ' + result.quoteNumber + ' received';
-      document.getElementById('success-body').insertAdjacentHTML('beforeend',
-        ' Our team will review your request and send your itemized quotation to your email within 1 business day.');
-      actions.innerHTML = `
-        <a href="products.html" class="btn-outline">Continue Browsing</a>`;
-      clearCart();
-    } else {
-      document.getElementById('success-heading').textContent = 'Request received';
-      document.getElementById('success-body').insertAdjacentHTML('beforeend',
-        ' We couldn\'t confirm this automatically — message us on WhatsApp and we\'ll follow up directly.');
-      actions.innerHTML = `
-        <a href="https://wa.me/27780316138" target="_blank" rel="noopener" class="btn-cta">Message on WhatsApp</a>
-        <a href="products.html" class="btn-outline">Continue Browsing</a>`;
+      const actions = document.getElementById('success-actions');
+      if (result && result.ok) {
+        document.getElementById('success-heading').textContent = 'Request ' + result.quoteNumber + ' received';
+        document.getElementById('success-body').insertAdjacentHTML('beforeend',
+          ' Our team will review your request and send your itemized quotation to your email within 1 business day.');
+        actions.innerHTML = `
+          <a href="products.html" class="btn-outline">Continue Browsing</a>`;
+        clearCart();
+      } else {
+        document.getElementById('success-heading').textContent = 'Request received';
+        document.getElementById('success-body').insertAdjacentHTML('beforeend',
+          ' We couldn\'t confirm this automatically — message us on WhatsApp and we\'ll follow up directly.');
+        actions.innerHTML = `
+          <a href="https://wa.me/27780316138" target="_blank" rel="noopener" class="btn-cta">Message on WhatsApp</a>
+          <a href="products.html" class="btn-outline">Continue Browsing</a>`;
+      }
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Quote Request';
     }
   });
 </script>
