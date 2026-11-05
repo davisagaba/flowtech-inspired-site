@@ -1910,28 +1910,40 @@ app.put('/admin/formal-quotes/:id', requireAdmin, async (req, res) => {
   const isDraft = docs[idx].status === 'draft';
 
   if (!isDraft) {
-    // Once issued, items/pricing/doc number are locked, but these reference
-    // fields carry no financial weight and commonly get filled in after the
-    // fact (e.g. a client calls back with their account/VAT/PO number) — so
-    // they stay editable without forcing a full void-and-reissue.
-    const allowed = ['account', 'customerVatNo', 'refNo', 'accountRep', 'itemWeights'];
+    // Once issued, the document number and the number of line items are
+    // locked, but everything else — reference fields and each item's own
+    // code/description/qty/price/weight — can still be corrected (e.g. a
+    // client typed a product name we don't stock, or a price was wrong)
+    // without forcing a full void-and-reissue. Adding/removing line items
+    // still requires a new document, since that changes the shape of the
+    // numbered quote itself.
+    const allowed = ['account', 'customerVatNo', 'refNo', 'accountRep', 'items'];
     const hasDisallowedChange = Object.keys(b).some((k) => !allowed.includes(k));
     if (hasDisallowedChange) {
-      return res.status(400).json({ ok: false, error: 'Only Account, VAT Reg No, Ref No, Account Rep and item weights can be edited after issuing — void and reissue for description/qty/price changes.' });
+      return res.status(400).json({ ok: false, error: 'Only Account, VAT Reg No, Ref No, Account Rep and item details can be edited after issuing — void and reissue to add or remove line items.' });
     }
-    if (Array.isArray(b.itemWeights)) {
-      if (b.itemWeights.length !== docs[idx].items.length) {
-        return res.status(400).json({ ok: false, error: 'Weight list does not match the number of line items.' });
+    if (Array.isArray(b.items)) {
+      if (b.items.length !== docs[idx].items.length) {
+        return res.status(400).json({ ok: false, error: 'Item count cannot change after issuing — void and reissue to add or remove line items.' });
       }
-      docs[idx].items = docs[idx].items.map((it, i) => ({ ...it, weight: Number(b.itemWeights[i]) || 0 }));
+      docs[idx].items = docs[idx].items.map((it, i) => ({
+        ...it,
+        code: b.items[i].code !== undefined ? String(b.items[i].code) : it.code,
+        description: b.items[i].description !== undefined ? String(b.items[i].description) : it.description,
+        manufacturerCode: b.items[i].manufacturerCode !== undefined ? String(b.items[i].manufacturerCode) : it.manufacturerCode,
+        qty: b.items[i].qty !== undefined ? Number(b.items[i].qty) || 0 : it.qty,
+        unitPrice: b.items[i].unitPrice !== undefined ? Number(b.items[i].unitPrice) || 0 : it.unitPrice,
+        weight: b.items[i].weight !== undefined ? Number(b.items[i].weight) || 0 : it.weight,
+      }));
       docs[idx].totalWeight = docs[idx].items.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 0), 0);
     }
-    allowed.filter((k) => k !== 'itemWeights').forEach((k) => { if (k in b) docs[idx][k] = b[k]; });
+    allowed.filter((k) => k !== 'items').forEach((k) => { if (k in b) docs[idx][k] = b[k]; });
     docs[idx].lastOperator = req.adminUser;
     if (docs[idx].pdfPath) {
-      const { filePath, streamPromise } = buildQuotationPdf(docs[idx]);
+      const { filePath, totals, streamPromise } = buildQuotationPdf(docs[idx]);
       await streamPromise;
       docs[idx].pdfPath = filePath;
+      docs[idx].totals = totals;
     }
     saveFormalDocs(docs);
     logActivity(req.adminUser, 'edited_formal_quote', `#${id} (reference fields)`);

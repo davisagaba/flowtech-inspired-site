@@ -538,9 +538,9 @@
     <div class="form-row"><label>Ref No (customer's own PO ref)</label><input type="text" id="qr-refNo"></div>
     <div class="form-row"><label>Account Rep (code)</label><input type="text" id="qr-accountRep" placeholder="e.g. ON01"></div>
     <div class="form-row">
-      <label>Item Weights (kg, each)</label>
+      <label>Line Items <span class="muted" style="font-weight:400;">(code/description/qty/price/weight can be corrected here — void and reissue to add or remove a line)</span></label>
       <table style="margin-bottom:0;">
-        <thead><tr><th>Item</th><th>Qty</th><th>Weight (kg, each)</th><th>Line Total (kg)</th></tr></thead>
+        <thead><tr><th>Code</th><th>Description</th><th>Qty</th><th>Unit Price (ZAR)</th><th>Weight (kg, each)</th><th>Line Total (kg)</th></tr></thead>
         <tbody id="qr-weights-tbody"></tbody>
       </table>
       <p class="muted" style="margin-top:8px;">Total weight: <strong id="qr-total-weight">0</strong> KG</p>
@@ -2031,9 +2031,15 @@
       const weight = it.weight || (catalogProduct ? catalogProduct.weight : 0) || 0;
       return `
       <tr>
-        <td>${it.description || it.code || 'Item ' + (i + 1)}</td>
-        <td>${it.qty || 0}</td>
-        <td><input type="number" step="0.01" min="0" id="qr-weight-${i}" data-qty="${it.qty || 0}" value="${weight}" style="width:90px;" oninput="recalcQuoteRefWeight()"></td>
+        <td><input type="text" id="qr-code-${i}" value="${it.code || ''}" style="width:60px;"></td>
+        <td style="position:relative;">
+          <input type="text" id="qr-desc-${i}" value="${it.description || ''}" style="width:150px;" autocomplete="off"
+            oninput="filterQuoteRefItemSuggestions(${i})" onblur="setTimeout(() => { const b = document.getElementById('qr-suggestions-${i}'); if (b) b.hidden = true; }, 150)">
+          <div id="qr-suggestions-${i}" class="qproduct-suggestions" style="width:260px;" hidden></div>
+        </td>
+        <td><input type="number" id="qr-qty-${i}" value="${it.qty || 0}" style="width:50px;" oninput="recalcQuoteRefWeight()"></td>
+        <td><input type="number" step="0.01" id="qr-price-${i}" value="${it.unitPrice || 0}" style="width:80px;"></td>
+        <td><input type="number" step="0.01" min="0" id="qr-weight-${i}" value="${weight}" style="width:80px;" oninput="recalcQuoteRefWeight()"></td>
         <td id="qr-line-total-${i}">${(weight * (Number(it.qty) || 0)).toFixed(2)}</td>
       </tr>`;
     }).join('');
@@ -2042,11 +2048,37 @@
     document.getElementById('quote-ref-modal').classList.add('open');
   }
 
+  function filterQuoteRefItemSuggestions(i) {
+    const term = document.getElementById(`qr-desc-${i}`).value.trim().toLowerCase();
+    const box = document.getElementById(`qr-suggestions-${i}`);
+    if (term.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+    const matches = currentProducts
+      .filter((p) => (p.name || '').toLowerCase().includes(term) || (p.code || '').toLowerCase().includes(term))
+      .slice(0, 8);
+    if (matches.length === 0) { box.hidden = true; box.innerHTML = ''; return; }
+    box.innerHTML = matches.map((p, mi) => `
+      <div class="qproduct-suggestion" data-mi="${mi}">${p.name}<span class="qps-code">${p.code || ''}</span></div>
+    `).join('');
+    box.hidden = false;
+    box.querySelectorAll('.qproduct-suggestion').forEach((el) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const product = matches[Number(el.dataset.mi)];
+        document.getElementById(`qr-code-${i}`).value = product.code || '';
+        document.getElementById(`qr-desc-${i}`).value = product.name || '';
+        document.getElementById(`qr-price-${i}`).value = (Number(product.price) * GBP_TO_ZAR_RATE).toFixed(2);
+        if (product.weight) document.getElementById(`qr-weight-${i}`).value = product.weight;
+        box.hidden = true;
+        recalcQuoteRefWeight();
+      });
+    });
+  }
+
   function recalcQuoteRefWeight() {
     let total = 0;
     document.querySelectorAll('#qr-weights-tbody input[id^="qr-weight-"]').forEach((input) => {
       const i = input.id.replace('qr-weight-', '');
-      const qty = Number(input.dataset.qty) || 0;
+      const qty = Number(document.getElementById('qr-qty-' + i).value) || 0;
       const weight = Number(input.value) || 0;
       const lineTotal = weight * qty;
       total += lineTotal;
@@ -2063,13 +2095,19 @@
   function saveQuoteRefFields() {
     const id = document.getElementById('qr-id').value;
     const q = currentFormalQuotes.find((x) => x.id === Number(id));
-    const itemWeights = (q.items || []).map((_, i) => Number(document.getElementById('qr-weight-' + i).value) || 0);
+    const items = (q.items || []).map((_, i) => ({
+      code: document.getElementById('qr-code-' + i).value.trim(),
+      description: document.getElementById('qr-desc-' + i).value.trim(),
+      qty: Number(document.getElementById('qr-qty-' + i).value) || 0,
+      unitPrice: Number(document.getElementById('qr-price-' + i).value) || 0,
+      weight: Number(document.getElementById('qr-weight-' + i).value) || 0,
+    }));
     const payload = {
       account: document.getElementById('qr-account').value.trim(),
       customerVatNo: document.getElementById('qr-customerVatNo').value.trim(),
       refNo: document.getElementById('qr-refNo').value.trim(),
       accountRep: document.getElementById('qr-accountRep').value.trim(),
-      itemWeights,
+      items,
     };
     fetch('/api/admin/formal-quotes/' + id + '?' + authQS(), {
       method: 'PUT',
