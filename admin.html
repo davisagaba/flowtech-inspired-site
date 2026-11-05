@@ -1848,7 +1848,15 @@
     return fetch('/api/admin/formal-quotes?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
-        currentFormalQuotes = data.quotes || [];
+        // Needs-attention first: drafts and issued-but-unsent quotes sort
+        // to the top (oldest first, so the longest-waiting shows up
+        // first), already-sent ones sink lower, void sinks lowest.
+        const STATUS_URGENCY = { draft: 0, issued: 1, sent: 2, void: 3 };
+        currentFormalQuotes = (data.quotes || []).slice().sort((a, b) => {
+          const rankDiff = (STATUS_URGENCY[a.status] ?? 9) - (STATUS_URGENCY[b.status] ?? 9);
+          if (rankDiff !== 0) return rankDiff;
+          return new Date(a.createdAt || a.date) - new Date(b.createdAt || b.date);
+        });
         document.querySelector('#formal-quotes-table tbody').innerHTML = currentFormalQuotes.map((q) => {
           const total = q.totals ? fmtZAR(q.totals.total) : '—';
           const canEdit = q.status === 'draft';
