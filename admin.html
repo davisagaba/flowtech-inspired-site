@@ -1908,7 +1908,7 @@
     document.getElementById('fq-customerVatNo').value = src ? src.customerVatNo : '';
     document.getElementById('fq-refNo').value = src ? src.refNo : '';
     document.getElementById('fq-accountRep').value = src ? src.accountRep : '';
-    document.getElementById('fq-discountRate').value = src ? src.discountRate : 10;
+    document.getElementById('fq-discountRate').value = q ? q.discountRate : 10;
     document.getElementById('fq-items-tbody').innerHTML = '';
     fqItemRowCount = 0;
     if (src && src.items && src.items.length) {
