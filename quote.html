@@ -216,6 +216,7 @@
               <button type="button" class="qty-btn" data-i="${i}" data-dir="1" aria-label="Increase quantity">+</button>
             </div>
             &times; ${formatPrice(product.price)} = <strong>${formatPrice(product.price * qty)}</strong>
+            <button type="button" class="qty-remove-btn" data-i="${i}" aria-label="Remove item" title="Remove">&times;</button>
           </td>
         </tr>`)
       .join('');
@@ -238,6 +239,17 @@
       input.addEventListener('change', () => {
         const i = Number(input.dataset.i);
         quoteItems[i].qty = Math.max(1, Number(input.value) || 1);
+        renderQuoteItems();
+      });
+    });
+    document.querySelectorAll('.qty-remove-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.i);
+        quoteItems.splice(i, 1);
+        if (quoteItems.length === 0) {
+          itemsWrap.hidden = true;
+          fallbackWrap.hidden = false;
+        }
         renderQuoteItems();
       });
     });
@@ -280,7 +292,12 @@
   }
 
   function selectQproductSuggestion(product) {
-    quoteItems.push({ id: product.id, qty: 1, product });
+    const existing = quoteItems.find((item) => item.id === product.id);
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      quoteItems.push({ id: product.id, qty: 1, product });
+    }
     fallbackWrap.hidden = true;
     itemsWrap.hidden = false;
     suggestionsBox.hidden = true;

@@ -746,6 +746,7 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
   font-size: 14px;
   font-weight: 600;
 }
+.quote-form label[hidden] { display: none; }
 .quote-form input, .quote-form select, .quote-form textarea {
   display: block;
   width: 100%;
@@ -778,6 +779,18 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
 .qty-stepper .qty-btn:hover { background: #e6e7e4; }
 .qty-stepper .qty-input { width: 40px; border: none; text-align: center; font-family: inherit; font-size: 13px; -moz-appearance: textfield; }
 .qty-stepper .qty-input::-webkit-outer-spin-button, .qty-stepper .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty-remove-btn {
+  background: none;
+  border: none;
+  color: #b33;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  margin-left: 10px;
+  padding: 2px 6px;
+  vertical-align: middle;
+}
+.qty-remove-btn:hover { color: #800; }
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
