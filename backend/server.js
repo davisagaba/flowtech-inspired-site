@@ -529,7 +529,7 @@ function getProductById(id) {
 }
 
 function getProductBySlug(slug) {
-  return CATALOG.find((p) => p.slug === slug);
+  return CATALOG.find((p) => p.slug === slug || (p.slugHistory || []).includes(slug));
 }
 
 function getProductByParam(params) {
@@ -596,6 +596,14 @@ app.put('/admin/products/:id', requireAdmin, (req, res) => {
   const products = loadProducts();
   const idx = products.findIndex((p) => p.id === id);
   if (idx === -1) return res.status(404).json({ ok: false, error: 'Product not found.' });
+  // Preserve every slug this product has ever had, so an old shared/indexed
+  // link keeps resolving after a rename instead of 404ing.
+  if (req.body.name && req.body.name !== products[idx].name) {
+    const oldSlug = slugify(products[idx].name);
+    const history = products[idx].slugHistory || [];
+    if (!history.includes(oldSlug)) history.push(oldSlug);
+    products[idx].slugHistory = history;
+  }
   products[idx] = { ...products[idx], ...req.body, id };
   saveProducts(products);
   logActivity(req.adminUser, 'updated_product', products[idx].name);
