@@ -38,6 +38,9 @@ const DEFAULT_SETTINGS = {
   companyRegNo: '1998/017285/07',
   landline: '+27 87 147 0677',
   whatsappNumber: '+27 78 031 6138',
+  // Printed as CREATED BY / LAST OPERATOR on every formal document,
+  // regardless of which admin account actually issued it.
+  documentOperatorName: 'Lebogang Mokoena',
 };
 function loadSettings() {
   if (!fs.existsSync(SETTINGS_JSON)) return { ...DEFAULT_SETTINGS };
@@ -1089,8 +1092,8 @@ function buildQuotationPdf(quote) {
 
   // ---- Footer table ----
   const footCols = [
-    ['CREATED BY', quote.createdBy || ''],
-    ['LAST OPERATOR', quote.lastOperator || quote.createdBy || ''],
+    ['CREATED BY', settings.documentOperatorName || quote.createdBy || ''],
+    ['LAST OPERATOR', settings.documentOperatorName || quote.lastOperator || quote.createdBy || ''],
     ['ACCOUNT REP', quote.accountRep || ''],
     ['WEIGHT', `${quote.totalWeight || 0}KG`],
     ['INTERNAL REF', quote.internalRef || ''],
