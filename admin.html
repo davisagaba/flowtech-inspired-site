@@ -530,6 +530,12 @@
     <div class="form-row"><label>Customer VAT Reg No</label><input type="text" id="qr-customerVatNo"></div>
     <div class="form-row"><label>Ref No (customer's own PO ref)</label><input type="text" id="qr-refNo"></div>
     <div class="form-row"><label>Account Rep (code)</label><input type="text" id="qr-accountRep" placeholder="e.g. ON01"></div>
+    <div class="form-row">
+      <label>Item Weights (kg, each)</label>
+      <table style="margin-bottom:0;">
+        <tbody id="qr-weights-tbody"></tbody>
+      </table>
+    </div>
     <p class="muted" id="quote-ref-status"></p>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeQuoteRefModal()">Cancel</button>
@@ -1904,6 +1910,11 @@
     document.getElementById('qr-customerVatNo').value = q.customerVatNo || '';
     document.getElementById('qr-refNo').value = q.refNo || '';
     document.getElementById('qr-accountRep').value = q.accountRep || '';
+    document.getElementById('qr-weights-tbody').innerHTML = (q.items || []).map((it, i) => `
+      <tr>
+        <td>${it.description || it.code || 'Item ' + (i + 1)}</td>
+        <td><input type="number" step="0.01" min="0" id="qr-weight-${i}" value="${it.weight || 0}" style="width:90px;"></td>
+      </tr>`).join('');
     document.getElementById('quote-ref-status').textContent = '';
     document.getElementById('quote-ref-modal').classList.add('open');
   }
@@ -1914,11 +1925,14 @@
 
   function saveQuoteRefFields() {
     const id = document.getElementById('qr-id').value;
+    const q = currentFormalQuotes.find((x) => x.id === Number(id));
+    const itemWeights = (q.items || []).map((_, i) => Number(document.getElementById('qr-weight-' + i).value) || 0);
     const payload = {
       account: document.getElementById('qr-account').value.trim(),
       customerVatNo: document.getElementById('qr-customerVatNo').value.trim(),
       refNo: document.getElementById('qr-refNo').value.trim(),
       accountRep: document.getElementById('qr-accountRep').value.trim(),
+      itemWeights,
     };
     fetch('/api/admin/formal-quotes/' + id + '?' + authQS(), {
       method: 'PUT',

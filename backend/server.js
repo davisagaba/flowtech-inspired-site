@@ -1889,12 +1889,19 @@ app.put('/admin/formal-quotes/:id', requireAdmin, async (req, res) => {
     // fields carry no financial weight and commonly get filled in after the
     // fact (e.g. a client calls back with their account/VAT/PO number) — so
     // they stay editable without forcing a full void-and-reissue.
-    const allowed = ['account', 'customerVatNo', 'refNo', 'accountRep'];
+    const allowed = ['account', 'customerVatNo', 'refNo', 'accountRep', 'itemWeights'];
     const hasDisallowedChange = Object.keys(b).some((k) => !allowed.includes(k));
     if (hasDisallowedChange) {
-      return res.status(400).json({ ok: false, error: 'Only Account, VAT Reg No, Ref No and Account Rep can be edited after issuing — void and reissue for item/pricing changes.' });
+      return res.status(400).json({ ok: false, error: 'Only Account, VAT Reg No, Ref No, Account Rep and item weights can be edited after issuing — void and reissue for description/qty/price changes.' });
     }
-    allowed.forEach((k) => { if (k in b) docs[idx][k] = b[k]; });
+    if (Array.isArray(b.itemWeights)) {
+      if (b.itemWeights.length !== docs[idx].items.length) {
+        return res.status(400).json({ ok: false, error: 'Weight list does not match the number of line items.' });
+      }
+      docs[idx].items = docs[idx].items.map((it, i) => ({ ...it, weight: Number(b.itemWeights[i]) || 0 }));
+      docs[idx].totalWeight = docs[idx].items.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 0), 0);
+    }
+    allowed.filter((k) => k !== 'itemWeights').forEach((k) => { if (k in b) docs[idx][k] = b[k]; });
     docs[idx].lastOperator = req.adminUser;
     if (docs[idx].pdfPath) {
       const { filePath, streamPromise } = buildQuotationPdf(docs[idx]);
