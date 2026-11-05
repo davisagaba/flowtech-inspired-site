@@ -1932,6 +1932,11 @@ app.post('/admin/formal-quotes/:id/issue', requireAdmin, async (req, res) => {
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Quote not found.' });
 
     const quote = docs[idx];
+    const missing = ['account', 'customerVatNo', 'refNo'].filter((k) => !String(quote[k] || '').trim());
+    if (missing.length) {
+      const labels = { account: 'Account', customerVatNo: 'VAT Reg No', refNo: 'Ref No' };
+      return res.status(400).json({ ok: false, error: `Fill in ${missing.map((k) => labels[k]).join(', ')} before issuing this quote.` });
+    }
     if (!quote.docNumber) {
       quote.docNumber = nextFormalDocNumber('QT');
       quote.internalRef = quote.docNumber.split('-').pop();
