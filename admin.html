@@ -796,10 +796,40 @@
         loadMail(currentMailFolder);
         loadOverviewExtras();
         loadWhoami();
+        startAutoRefresh();
       })
       .catch(() => {
         document.getElementById('login-error').textContent = 'Incorrect username or password.';
       });
+  }
+
+  // ---------- Auto-refresh ----------
+  // Keeps whichever panel is open up to date without a manual reload.
+  // Skips entirely while any modal is open so it never yanks away an
+  // in-progress edit, compose draft, or open mail message mid-read.
+  let autoRefreshTimer = null;
+  function startAutoRefresh() {
+    if (autoRefreshTimer) return;
+    autoRefreshTimer = setInterval(autoRefreshTick, 30000);
+  }
+
+  function anyModalOpen() {
+    return document.querySelectorAll('.modal-overlay.open').length > 0;
+  }
+
+  function autoRefreshTick() {
+    if (document.getElementById('login-box').style.display !== 'none') return;
+    if (anyModalOpen()) return;
+    refreshAnalytics();
+    if (currentPanel === 'email') {
+      if (openMailIndex === null) loadMail(currentMailFolder);
+    } else {
+      updateUnreadBadge();
+    }
+    if (currentPanel === 'formalquotes') loadFormalQuotes();
+    if (currentPanel === 'clients') loadClients();
+    if (currentPanel === 'stock') loadStock();
+    if (currentPanel === 'activity') loadActivity();
   }
 
   function refreshAnalytics() {
@@ -1090,10 +1120,12 @@
     visitors: 'Visitors', activity: 'Activity Log', users: 'Admin Users', settings: 'Settings',
   };
   const OWNER_ONLY_PANELS = ['activity', 'users', 'settings'];
+  let currentPanel = 'overview';
   function switchPanel(name) {
     if (OWNER_ONLY_PANELS.includes(name) && currentUserRole !== 'admin') {
       name = 'overview';
     }
+    currentPanel = name;
     PANEL_NAMES.forEach((p) => {
       document.getElementById('panel-' + p).classList.toggle('active', p === name);
       document.getElementById('ptab-' + p).classList.toggle('active', p === name);
