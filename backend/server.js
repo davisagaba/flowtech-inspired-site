@@ -1872,6 +1872,43 @@ app.get('/admin/formal-quotes/:id/pdf', requireAdmin, (req, res) => {
   res.download(quote.pdfPath, path.basename(quote.pdfPath));
 });
 
+// Opens an already-issued quote's PDF inline in the browser tab — no forced
+// file download, just viewing it.
+app.get('/admin/formal-quotes/:id/view', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const quote = loadFormalDocs().find((d) => d.id === id);
+  if (!quote || !quote.pdfPath || !fs.existsSync(quote.pdfPath)) {
+    return res.status(404).json({ ok: false, error: 'PDF not generated yet — issue the quote first.' });
+  }
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${path.basename(quote.pdfPath)}"`);
+  fs.createReadStream(quote.pdfPath).pipe(res);
+});
+
+// Renders the CURRENT draft data as a PDF for review, without issuing it —
+// no document number is consumed and nothing is persisted. Opens inline.
+app.get('/admin/formal-quotes/:id/preview', requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const docs = loadFormalDocs();
+    const quote = docs.find((d) => d.id === id);
+    if (!quote) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+
+    const previewQuote = { ...quote, docNumber: quote.docNumber || 'PREVIEW — NOT YET ISSUED', status: 'draft' };
+    const { filePath, streamPromise } = buildQuotationPdf(previewQuote);
+    await streamPromise;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="quotation-preview.pdf"');
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+    stream.on('close', () => fs.unlink(filePath, () => {}));
+  } catch (err) {
+    console.error('Preview formal quote error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);

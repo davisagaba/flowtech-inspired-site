@@ -513,6 +513,7 @@
     <p class="muted" id="formal-quote-status"></p>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeFormalQuoteForm()">Cancel</button>
+      <button class="btn-outline-sm" onclick="saveFormalQuote(true)">Save &amp; Preview</button>
       <button class="btn" onclick="saveFormalQuote()">Save Draft</button>
     </div>
   </div>
@@ -1673,7 +1674,9 @@
             <td><span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status}</span></td>
             <td>
               ${canEdit ? `<button class="btn-outline-sm" onclick="openFormalQuoteForm(${q.id})">Edit</button>` : ''}
+              ${canEdit && q.items && q.items.length ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/preview?${authQS()}" target="_blank">Preview</a>` : ''}
               ${canIssue ? `<button class="btn-outline-sm" onclick="issueFormalQuote(${q.id}, this)">Issue PDF</button>` : ''}
+              ${q.pdfPath ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/view?${authQS()}" target="_blank">View</a>` : ''}
               ${q.pdfPath ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/pdf?${authQS()}" target="_blank">Download</a>` : ''}
               ${canSend ? `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendFormalQuote(${q.id}, this)">Send</button>` : ''}
               ${q.status !== 'void' ? `<button class="btn-danger-sm" onclick="removeFormalQuote(${q.id})">${q.status === 'draft' ? 'Delete' : 'Void'}</button>` : ''}
@@ -1743,7 +1746,7 @@
     document.getElementById('formal-quote-modal').classList.remove('open');
   }
 
-  function saveFormalQuote() {
+  function saveFormalQuote(thenPreview) {
     const id = document.getElementById('fq-id').value;
     const payload = {
       customerName: document.getElementById('fq-customerName').value.trim(),
@@ -1772,7 +1775,11 @@
         if (!data.ok) throw new Error(data.error || 'Failed');
         closeFormalQuoteForm();
         loadFormalQuotes();
-        showMailToast('Quotation draft saved.');
+        if (thenPreview) {
+          window.open('/api/admin/formal-quotes/' + data.quote.id + '/preview?' + authQS(), '_blank');
+        } else {
+          showMailToast('Quotation draft saved.');
+        }
       })
       .catch((err) => {
         document.getElementById('formal-quote-status').textContent = 'Error: ' + err.message;
