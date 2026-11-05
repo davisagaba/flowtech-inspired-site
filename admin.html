@@ -655,7 +655,7 @@
     <p class="muted" id="compose-status"></p>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeCompose()">Cancel</button>
-      <button class="btn" onclick="sendCompose()">Send</button>
+      <button class="btn" id="compose-send-btn" onclick="sendCompose(this)">Send</button>
     </div>
   </div>
 </div>
@@ -1386,7 +1386,7 @@
         <p class="muted" id="reply-status"></p>
         <div class="inline-reply-actions">
           <button class="btn-cancel" onclick="cancelInlineReply()">Cancel</button>
-          <button class="btn" onclick="sendInlineReply(${i})">Send Reply</button>
+          <button class="btn" id="inline-reply-send-btn" onclick="sendInlineReply(${i}, this)">Send Reply</button>
         </div>
       </div>
     `;
@@ -1531,7 +1531,8 @@
     renderReplyAttachChips();
   }
 
-  function sendInlineReply(i) {
+  function sendInlineReply(i, btn) {
+    if (btn && btn.disabled) return; // already sending — ignore a double-click
     const m = currentMailMessages[i];
     const replyText = document.getElementById('reply-body').value;
     const status = document.getElementById('reply-status');
@@ -1543,6 +1544,7 @@
       (m.body || '').split('\n').map((l) => '> ' + l).join('\n');
     const body = replyText + quoted;
     status.textContent = 'Sending…';
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
     fetch('/api/admin/mailbox/send?' + authQS(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1579,6 +1581,7 @@
       })
       .catch((err) => {
         status.textContent = 'Error: ' + err.message;
+        if (btn) { btn.disabled = false; btn.textContent = 'Send Reply'; }
       });
   }
 
@@ -1598,7 +1601,13 @@
 
   // ---------- Compose (new email, modal) ----------
   let composeForwardIndex = null;
+  function resetComposeSendBtn() {
+    const btn = document.getElementById('compose-send-btn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
+
   function openCompose(forwardIndex) {
+    resetComposeSendBtn();
     composeForwardIndex = (typeof forwardIndex === 'number') ? forwardIndex : null;
     const fwd = (typeof forwardIndex === 'number') ? currentMailMessages[forwardIndex] : null;
     document.getElementById('compose-modal-title').textContent = fwd ? 'Forward Email' : 'Compose Email';
@@ -1629,6 +1638,7 @@
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Could not load email preview.');
+        resetComposeSendBtn();
         document.getElementById('compose-modal-title').textContent = 'Send Quotation';
         document.getElementById('c-in-reply-to').value = '';
         document.getElementById('c-formal-quote-id').value = id;
@@ -1649,7 +1659,8 @@
       .catch((err) => alert('Could not open quotation for sending: ' + err.message));
   }
 
-  function sendCompose() {
+  function sendCompose(btn) {
+    if (btn && btn.disabled) return; // already sending — ignore a double-click
     const formalQuoteId = document.getElementById('c-formal-quote-id').value;
     const to = document.getElementById('c-to').value.trim();
     const cc = document.getElementById('c-cc').value.trim();
@@ -1662,6 +1673,7 @@
     }
     const status = document.getElementById('compose-status');
     status.textContent = 'Sending…';
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
 
     const url = formalQuoteId
       ? '/api/admin/formal-quotes/' + formalQuoteId + '/send?' + authQS()
@@ -1702,6 +1714,7 @@
       })
       .catch((err) => {
         status.textContent = 'Error: ' + err.message;
+        if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
       });
   }
 
