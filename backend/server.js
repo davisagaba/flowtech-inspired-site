@@ -382,7 +382,7 @@ app.post('/quote', (req, res) => {
       account: '',
       customerVatNo: '',
       refNo: '',
-      discountRate: 0,
+      discountRate: 10,
       vatRate: 0.15,
       items: formalItems,
       totalWeight: 0,
