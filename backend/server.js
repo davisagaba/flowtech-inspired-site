@@ -2055,7 +2055,7 @@ function buildQuotationEmail(quote) {
     settings.salesRepTitle || '',
     settings.legalName,
     '',
-    `Mobile: ${settings.whatsappNumber}`,
+    `Tel: ${settings.landline}`,
     `Email: ${process.env.LSC_SMTP_USER}`,
     `Website: ${settings.website}`,
     '',
@@ -2193,6 +2193,28 @@ app.delete('/admin/formal-quotes/:id', requireAdmin, (req, res) => {
   }
   logActivity(req.adminUser, 'removed_formal_quote', String(id));
   res.json({ ok: true });
+});
+
+// Hard-deletes every formal quote and quote-request log entry tied to the
+// given customer email addresses, bypassing the normal void-only rule for
+// issued/sent documents. Admin-only — for purging test/garbage data, not a
+// routine operation (real documents should be voided, not erased).
+app.post('/admin/purge-test-data', requireAdmin, requireOwner, (req, res) => {
+  const emails = (req.body && req.body.emails || []).map((e) => String(e).toLowerCase().trim()).filter(Boolean);
+  if (emails.length === 0) return res.status(400).json({ ok: false, error: 'No emails provided.' });
+
+  const docs = loadFormalDocs();
+  const removedDocs = docs.filter((d) => emails.includes(String(d.customerEmail || '').toLowerCase()));
+  const keptDocs = docs.filter((d) => !emails.includes(String(d.customerEmail || '').toLowerCase()));
+  saveFormalDocs(keptDocs);
+
+  const logEntries = readJsonLines(LOG_PATH);
+  const removedLog = logEntries.filter((q) => emails.includes(String(q.email || '').toLowerCase()));
+  const keptLog = logEntries.filter((q) => !emails.includes(String(q.email || '').toLowerCase()));
+  fs.writeFileSync(LOG_PATH, keptLog.map((q) => JSON.stringify(q)).join('\n') + (keptLog.length ? '\n' : ''));
+
+  logActivity(req.adminUser, 'purged_test_data', `${emails.join(', ')} — ${removedDocs.length} quotes, ${removedLog.length} log entries`);
+  res.json({ ok: true, removedQuotes: removedDocs.length, removedLogEntries: removedLog.length });
 });
 
 app.get('/health', (req, res) => res.json({ ok: true }));
