@@ -2088,7 +2088,7 @@ app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
     const subject = req.body && req.body.subject ? req.body.subject : defaults.subject;
     const emailBody = req.body && req.body.body ? req.body.body : defaults.body;
 
-    await mailer.sendMail({
+    const mailOptions = {
       from: `"${settings.legalName}" <${process.env.LSC_SMTP_USER}>`,
       to: quote.customerEmail,
       subject,
@@ -2097,7 +2097,26 @@ app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
         { filename: path.basename(quote.pdfPath), path: quote.pdfPath },
         ...defaults.specAttachments,
       ],
-    });
+    };
+
+    await mailer.sendMail(mailOptions);
+
+    try {
+      const MailComposer = require('nodemailer/lib/mail-composer');
+      const raw = await new MailComposer(mailOptions).compile().build();
+      const sentFolder = await findSentFolder();
+      const client = imapClient();
+      await client.connect();
+      try {
+        await client.append(sentFolder, raw, ['\\Seen']);
+      } finally {
+        await client.logout().catch(() => {});
+      }
+    } catch (appendErr) {
+      // Non-fatal — the email was sent either way, it just won't show in
+      // Outbox until the mail server's own copy (if any) syncs.
+      console.warn('Sent-folder append failed (formal quote):', appendErr.message);
+    }
 
     quote.status = 'sent';
     quote.sentAt = new Date().toISOString();
