@@ -384,14 +384,18 @@ app.post('/quote', (req, res) => {
     // on top, so it's unwound here to avoid double-charging VAT.
     const docs = loadFormalDocs();
     const nextId = docs.reduce((max, d) => Math.max(max, d.id || 0), 0) + 1;
-    const formalItems = items.map((it) => ({
-      code: it.code || '',
-      description: it.name || '',
-      manufacturerCode: '',
-      qty: Number(it.qty) || 1,
-      unitPrice: Math.round(((Number(it.unitPrice) || 0) / 1.15) * 100) / 100,
-      weight: 0,
-    }));
+    const catalogProducts = loadProducts();
+    const formalItems = items.map((it) => {
+      const catalogProduct = it.code ? catalogProducts.find((p) => (p.code || '').toLowerCase() === String(it.code).toLowerCase()) : null;
+      return {
+        code: it.code || '',
+        description: it.name || '',
+        manufacturerCode: '',
+        qty: Number(it.qty) || 1,
+        unitPrice: Math.round(((Number(it.unitPrice) || 0) / 1.15) * 100) / 100,
+        weight: Number(catalogProduct && catalogProduct.weight) || 0,
+      };
+    });
     const formalQuote = {
       id: nextId,
       type: 'QT',
@@ -410,7 +414,7 @@ app.post('/quote', (req, res) => {
       discountRate: 10,
       vatRate: 0.15,
       items: formalItems,
-      totalWeight: 0,
+      totalWeight: formalItems.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 0), 0),
       accountRep: '',
       notes: [timeline, message].filter(Boolean).join(' — '),
       createdBy: 'Website',
@@ -1978,6 +1982,16 @@ app.post('/admin/formal-quotes/:id/issue', requireAdmin, async (req, res) => {
     if (!String(quote.account || '').trim()) quote.account = 'CASR023';
     if (!String(quote.customerVatNo || '').trim()) quote.customerVatNo = '4010136408';
     if (!String(quote.refNo || '').trim()) quote.refNo = quote.docNumber;
+    // Last-chance catalog weight fill — covers drafts created before the
+    // catalog had weights on file, or where staff issued without ever
+    // opening the item editor (which is what normally triggers the lookup).
+    const catalogProducts = loadProducts();
+    quote.items = (quote.items || []).map((it) => {
+      if (it.weight) return it;
+      const catalogProduct = it.code ? catalogProducts.find((p) => (p.code || '').toLowerCase() === String(it.code).toLowerCase()) : null;
+      return catalogProduct && catalogProduct.weight ? { ...it, weight: Number(catalogProduct.weight) } : it;
+    });
+    quote.totalWeight = quote.items.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 0), 0);
     quote.status = 'issued';
     quote.lastOperator = req.adminUser;
     quote.issuedAt = new Date().toISOString();
