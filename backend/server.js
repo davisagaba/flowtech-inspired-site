@@ -1069,7 +1069,12 @@ function buildQuotationPdf(quote) {
   const discount = (subtotal + vat) * (discountRate / 100);
   const total = subtotal + vat - discount;
 
-  y += 10;
+  // Anchors the terms box / footer table / bottom row near the bottom of
+  // the page — matching the sample's spacing — instead of them trailing
+  // immediately after a short item list and leaving the page half-empty.
+  // Still grows downward normally if enough items push past this point.
+  const BOTTOM_SECTION_MIN_Y = 560;
+  y = Math.max(y + 10, BOTTOM_SECTION_MIN_Y);
 
   // ---- Terms box ----
   // Dedicated legal wording for this document type — deliberately NOT the
