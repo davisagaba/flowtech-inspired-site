@@ -110,8 +110,8 @@
             <table class="specs-table" id="quote-items-table"></table>
             <p class="quote-items-total" id="quote-items-total"></p>
           </div>
-          <label id="qproduct-fallback-wrap" hidden style="position:relative;">Product / items you need a quote for
-            <input type="text" id="qproduct" placeholder="Start typing a product name…" autocomplete="off">
+          <label id="qproduct-fallback-wrap" hidden style="position:relative;">Search our products
+            <input type="text" id="qproduct" placeholder="Start typing a product name… (select from the list)" autocomplete="off">
             <div id="qproduct-suggestions" class="qproduct-suggestions" hidden></div>
           </label>
           <label>When do you need this by?
@@ -324,23 +324,19 @@
   document.getElementById('quote-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('qname').value;
-    if (quoteItems.length === 0 && !qproductInput.value.trim()) {
+    if (quoteItems.length === 0) {
       qproductInput.focus();
-      qproductInput.reportValidity && qproductInput.setCustomValidity('Please tell us which product(s) you need a quote for.');
+      qproductInput.setCustomValidity('Please select at least one product from the suggestions list — we can only quote products we actually stock.');
       qproductInput.reportValidity();
       qproductInput.setCustomValidity('');
       return;
     }
-    const productSummary = quoteItems.length > 0
-      ? quoteItems.map(({ qty, product }) => `${product.name} x${qty}`).join(', ')
-      : qproductInput.value.trim();
+    const productSummary = quoteItems.map(({ qty, product }) => `${product.name} x${qty}`).join(', ');
 
-    const payloadItems = quoteItems.length > 0
-      ? quoteItems.map(({ qty, product }) => {
-          const unitPrice = product.price * GBP_TO_ZAR_RATE * (1 + VAT_RATE);
-          return { name: product.name, code: product.code, qty, unitPrice, lineTotal: unitPrice * qty };
-        })
-      : [{ name: productSummary, code: '', qty: 1, unitPrice: 0, lineTotal: 0 }];
+    const payloadItems = quoteItems.map(({ qty, product }) => {
+      const unitPrice = product.price * GBP_TO_ZAR_RATE * (1 + VAT_RATE);
+      return { name: product.name, code: product.code, qty, unitPrice, lineTotal: unitPrice * qty };
+    });
 
     const submitBtn = document.getElementById('quote-submit-btn');
     submitBtn.disabled = true;
