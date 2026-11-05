@@ -2203,6 +2203,15 @@ app.post('/admin/purge-test-data', requireAdmin, requireOwner, (req, res) => {
   const emails = (req.body && req.body.emails || []).map((e) => String(e).toLowerCase().trim()).filter(Boolean);
   if (emails.length === 0) return res.status(400).json({ ok: false, error: 'No emails provided.' });
 
+  // Snapshot everything before this irreversible bulk delete, so a bad
+  // purge (wrong emails, or data that turns out not to be test data) can
+  // be recovered from /opt/lifestyle-ceramics/backups/.
+  try {
+    require('child_process').execFileSync('/opt/lifestyle-ceramics/backend/backup.sh');
+  } catch (err) {
+    console.warn('Pre-purge backup failed:', err.message);
+  }
+
   const docs = loadFormalDocs();
   const removedDocs = docs.filter((d) => emails.includes(String(d.customerEmail || '').toLowerCase()));
   const keptDocs = docs.filter((d) => !emails.includes(String(d.customerEmail || '').toLowerCase()));
