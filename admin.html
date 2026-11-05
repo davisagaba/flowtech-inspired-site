@@ -533,8 +533,10 @@
     <div class="form-row">
       <label>Item Weights (kg, each)</label>
       <table style="margin-bottom:0;">
+        <thead><tr><th>Item</th><th>Qty</th><th>Weight (kg, each)</th><th>Line Total (kg)</th></tr></thead>
         <tbody id="qr-weights-tbody"></tbody>
       </table>
+      <p class="muted" style="margin-top:8px;">Total weight: <strong id="qr-total-weight">0</strong> KG</p>
     </div>
     <p class="muted" id="quote-ref-status"></p>
     <div class="modal-actions">
@@ -1913,10 +1915,27 @@
     document.getElementById('qr-weights-tbody').innerHTML = (q.items || []).map((it, i) => `
       <tr>
         <td>${it.description || it.code || 'Item ' + (i + 1)}</td>
-        <td><input type="number" step="0.01" min="0" id="qr-weight-${i}" value="${it.weight || 0}" style="width:90px;"></td>
+        <td>${it.qty || 0}</td>
+        <td><input type="number" step="0.01" min="0" id="qr-weight-${i}" data-qty="${it.qty || 0}" value="${it.weight || 0}" style="width:90px;" oninput="recalcQuoteRefWeight()"></td>
+        <td id="qr-line-total-${i}">${((Number(it.weight) || 0) * (Number(it.qty) || 0)).toFixed(2)}</td>
       </tr>`).join('');
+    recalcQuoteRefWeight();
     document.getElementById('quote-ref-status').textContent = '';
     document.getElementById('quote-ref-modal').classList.add('open');
+  }
+
+  function recalcQuoteRefWeight() {
+    let total = 0;
+    document.querySelectorAll('#qr-weights-tbody input[id^="qr-weight-"]').forEach((input) => {
+      const i = input.id.replace('qr-weight-', '');
+      const qty = Number(input.dataset.qty) || 0;
+      const weight = Number(input.value) || 0;
+      const lineTotal = weight * qty;
+      total += lineTotal;
+      const cell = document.getElementById('qr-line-total-' + i);
+      if (cell) cell.textContent = lineTotal.toFixed(2);
+    });
+    document.getElementById('qr-total-weight').textContent = total.toFixed(2);
   }
 
   function closeQuoteRefModal() {
