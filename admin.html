@@ -519,6 +519,23 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="quote-ref-modal">
+  <div class="modal">
+    <h3>Edit Reference Details</h3>
+    <p class="muted">Items and pricing are locked on an issued quote — only these reference fields can still be changed.</p>
+    <input type="hidden" id="qr-id">
+    <div class="form-row"><label>Account</label><input type="text" id="qr-account"></div>
+    <div class="form-row"><label>Customer VAT Reg No</label><input type="text" id="qr-customerVatNo"></div>
+    <div class="form-row"><label>Ref No (customer's own PO ref)</label><input type="text" id="qr-refNo"></div>
+    <div class="form-row"><label>Account Rep (code)</label><input type="text" id="qr-accountRep" placeholder="e.g. ON01"></div>
+    <p class="muted" id="quote-ref-status"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeQuoteRefModal()">Cancel</button>
+      <button class="btn" onclick="saveQuoteRefFields()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="receipt-modal">
   <div class="modal">
     <h3>Record Payment / Generate Receipt</h3>
@@ -1765,6 +1782,7 @@
             <td><span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status}</span></td>
             <td>
               ${canEdit ? `<button class="btn-outline-sm" onclick="openFormalQuoteForm(${q.id})">Edit</button>` : ''}
+              ${!canEdit && q.status !== 'void' ? `<button class="btn-outline-sm" onclick="openQuoteRefModal(${q.id})">Edit Reference</button>` : ''}
               ${canEdit && q.items && q.items.length ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/preview?${authQS()}" target="_blank">Preview</a>` : ''}
               ${canIssue ? `<button class="btn-outline-sm" onclick="issueFormalQuote(${q.id}, this)">Issue PDF</button>` : ''}
               ${q.pdfPath ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/view?${authQS()}" target="_blank">View</a>` : ''}
@@ -1835,6 +1853,47 @@
 
   function closeFormalQuoteForm() {
     document.getElementById('formal-quote-modal').classList.remove('open');
+  }
+
+  function openQuoteRefModal(id) {
+    const q = currentFormalQuotes.find((x) => x.id === id);
+    if (!q) return;
+    document.getElementById('qr-id').value = id;
+    document.getElementById('qr-account').value = q.account || '';
+    document.getElementById('qr-customerVatNo').value = q.customerVatNo || '';
+    document.getElementById('qr-refNo').value = q.refNo || '';
+    document.getElementById('qr-accountRep').value = q.accountRep || '';
+    document.getElementById('quote-ref-status').textContent = '';
+    document.getElementById('quote-ref-modal').classList.add('open');
+  }
+
+  function closeQuoteRefModal() {
+    document.getElementById('quote-ref-modal').classList.remove('open');
+  }
+
+  function saveQuoteRefFields() {
+    const id = document.getElementById('qr-id').value;
+    const payload = {
+      account: document.getElementById('qr-account').value.trim(),
+      customerVatNo: document.getElementById('qr-customerVatNo').value.trim(),
+      refNo: document.getElementById('qr-refNo').value.trim(),
+      accountRep: document.getElementById('qr-accountRep').value.trim(),
+    };
+    fetch('/api/admin/formal-quotes/' + id + '?' + authQS(), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        closeQuoteRefModal();
+        loadFormalQuotes();
+        showMailToast('Reference details updated.');
+      })
+      .catch((err) => {
+        document.getElementById('quote-ref-status').textContent = 'Error: ' + err.message;
+      });
   }
 
   function saveFormalQuote(thenPreview) {

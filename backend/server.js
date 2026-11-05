@@ -1869,15 +1869,36 @@ app.post('/admin/formal-quotes', requireAdmin, (req, res) => {
   res.json({ ok: true, quote });
 });
 
-app.put('/admin/formal-quotes/:id', requireAdmin, (req, res) => {
+app.put('/admin/formal-quotes/:id', requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const docs = loadFormalDocs();
   const idx = docs.findIndex((d) => d.id === id);
   if (idx === -1) return res.status(404).json({ ok: false, error: 'Quote not found.' });
-  if (docs[idx].status !== 'draft') {
-    return res.status(400).json({ ok: false, error: 'Only draft quotes can be edited directly — issue a revision instead.' });
-  }
   const b = req.body || {};
+  const isDraft = docs[idx].status === 'draft';
+
+  if (!isDraft) {
+    // Once issued, items/pricing/doc number are locked, but these reference
+    // fields carry no financial weight and commonly get filled in after the
+    // fact (e.g. a client calls back with their account/VAT/PO number) — so
+    // they stay editable without forcing a full void-and-reissue.
+    const allowed = ['account', 'customerVatNo', 'refNo', 'accountRep'];
+    const hasDisallowedChange = Object.keys(b).some((k) => !allowed.includes(k));
+    if (hasDisallowedChange) {
+      return res.status(400).json({ ok: false, error: 'Only Account, VAT Reg No, Ref No and Account Rep can be edited after issuing — void and reissue for item/pricing changes.' });
+    }
+    allowed.forEach((k) => { if (k in b) docs[idx][k] = b[k]; });
+    docs[idx].lastOperator = req.adminUser;
+    if (docs[idx].pdfPath) {
+      const { filePath, streamPromise } = buildQuotationPdf(docs[idx]);
+      await streamPromise;
+      docs[idx].pdfPath = filePath;
+    }
+    saveFormalDocs(docs);
+    logActivity(req.adminUser, 'edited_formal_quote', `#${id} (reference fields)`);
+    return res.json({ ok: true, quote: docs[idx] });
+  }
+
   const totalWeight = Array.isArray(b.items)
     ? b.items.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 0), 0)
     : docs[idx].totalWeight;
