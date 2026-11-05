@@ -1509,6 +1509,34 @@ app.get('/admin/mailbox/attachment', requireAdmin, async (req, res) => {
   }
 });
 
+// Public contact form submission (services.html "Contact Us") — emails
+// straight to the business inbox, logged for a basic record/audit trail.
+const CONTACT_LOG = '/opt/lifestyle-ceramics/backend/contact-messages.log';
+app.post('/contact', async (req, res) => {
+  try {
+    const { name, email, message } = req.body || {};
+    if (!name || !email || !message) {
+      return res.status(400).json({ ok: false, error: 'Missing name, email or message.' });
+    }
+    const settings = loadSettings();
+    const date = new Date();
+
+    await mailer.sendMail({
+      from: `"${settings.companyName} Website" <${process.env.LSC_SMTP_USER}>`,
+      to: process.env.LSC_SMTP_USER,
+      replyTo: email,
+      subject: `New website contact form message from ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+    });
+
+    fs.appendFile(CONTACT_LOG, JSON.stringify({ name, email, message, date }) + '\n', () => {});
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Contact form error:', err);
+    res.status(500).json({ ok: false, error: 'Could not send message.' });
+  }
+});
+
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 const PORT = 4000;

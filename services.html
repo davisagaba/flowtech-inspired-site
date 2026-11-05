@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Services | Life Style Ceramics</title>
-<meta name="description" content="Support, FAQs and ways to reach Life Style Ceramics — find a dealer, request a quote, or contact our team directly.">
+<meta name="description" content="Support, FAQs and ways to reach Life Style Ceramics — request a quote or contact our team directly.">
 <link rel="canonical" href="https://lyfestyleceramics.co.za/services.html">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Services | Life Style Ceramics">
-<meta property="og:description" content="Support, FAQs and ways to reach Life Style Ceramics — find a dealer, request a quote, or contact our team directly.">
+<meta property="og:description" content="Support, FAQs and ways to reach Life Style Ceramics — request a quote or contact our team directly.">
 <meta property="og:url" content="https://lyfestyleceramics.co.za/services.html">
 <meta property="og:image" content="https://lyfestyleceramics.co.za/logo.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -97,24 +97,17 @@
 <section id="contact" class="products-section anchor-section alt-bg">
   <div class="container">
     <h2>Contact Us</h2>
-    <form class="contact-form" onsubmit="event.preventDefault(); alert('Thanks — we will be in touch shortly.');">
-      <label>Name<input type="text" required></label>
-      <label>Email<input type="email" required></label>
-      <label>Message<textarea rows="4" required></textarea></label>
-      <button type="submit" class="btn-cta">Send Message</button>
+    <p class="centered-note" style="margin-bottom:24px;">
+      <strong>Call us:</strong> <a href="tel:+27871470677">+27 87 147 0677</a><br>
+      <strong>WhatsApp / Cell:</strong> <a href="https://wa.me/27780316138" target="_blank" rel="noopener">+27 78 031 6138</a>
+    </p>
+    <form class="contact-form" id="contact-form">
+      <label>Name<input type="text" id="contact-name" required></label>
+      <label>Email<input type="email" id="contact-email" required></label>
+      <label>Message<textarea id="contact-message" rows="4" required></textarea></label>
+      <button type="submit" class="btn-cta" id="contact-submit-btn">Send Message</button>
+      <p class="centered-note" id="contact-status" style="margin-top:12px;"></p>
     </form>
-  </div>
-</section>
-
-<section id="showroom" class="products-section anchor-section">
-  <div class="container">
-    <h2>Find a Dealer</h2>
-    <p class="centered-note">Enter your city to find your nearest coverage area and contact details.</p>
-    <form class="showroom-form" id="dealer-search-form">
-      <input type="text" id="dealer-search-input" placeholder="e.g. Johannesburg, Cape Town, Durban">
-      <button type="submit" class="btn-outline">Search</button>
-    </form>
-    <div id="dealer-results"></div>
   </div>
 </section>
 
@@ -136,13 +129,17 @@
       <h4>Support</h4>
       <a href="services.html#faq">FAQ</a>
       <a href="services.html#contact">Contact Us</a>
-      <a href="services.html#showroom">Find a Dealer</a>
       <a href="quote.html">Request a Quote</a>
+    </div>
+    <div class="footer-col">
+      <h4>Contact</h4>
+      <a href="tel:+27871470677">+27 87 147 0677</a>
+      <a href="https://wa.me/27780316138" target="_blank" rel="noopener">+27 78 031 6138 (WhatsApp)</a>
     </div>
     <div class="footer-col">
       <h4>Follow Us</h4>
       <div class="social-links">
-        <a href="https://wa.me/" target="_blank" rel="noopener" aria-label="WhatsApp">WA</a>
+        <a href="https://wa.me/27780316138" target="_blank" rel="noopener" aria-label="WhatsApp">WA</a>
       </div>
     </div>
   </div>
@@ -163,40 +160,34 @@
 <script src="shop.js"></script>
 <script src="script.js"></script>
 <script>
-  const DEALER_COVERAGE = [
-    { city: "Johannesburg", region: "Gauteng" },
-    { city: "Pretoria", region: "Gauteng" },
-    { city: "Cape Town", region: "Western Cape" },
-    { city: "Durban", region: "KwaZulu-Natal" },
-    { city: "Port Elizabeth", region: "Eastern Cape" },
-    { city: "Bloemfontein", region: "Free State" },
-  ];
-
-  function renderDealerResults(query) {
-    const resultsEl = document.getElementById('dealer-results');
-    const q = query.trim().toLowerCase();
-    if (!q) { resultsEl.innerHTML = ''; return; }
-
-    const matches = DEALER_COVERAGE.filter((d) => d.city.toLowerCase().includes(q) || d.region.toLowerCase().includes(q));
-
-    if (matches.length === 0) {
-      resultsEl.innerHTML = `<p class="centered-note" style="margin-top:16px;">We don't have a listed coverage area for "${query}" yet — <a href="quote.html">request a quote</a> and we'll confirm delivery/installation to your location.</p>`;
-      return;
-    }
-
-    resultsEl.innerHTML = `
-      <ul class="dealer-list">
-        ${matches.map((d) => `
-          <li class="dealer-list-item">
-            <strong>${d.city}</strong> <span class="product-code">(${d.region})</span>
-            <p class="centered-note">We cover this area. <a href="quote.html">Request a quote</a> or contact us on WhatsApp for local installer details.</p>
-          </li>`).join('')}
-      </ul>`;
-  }
-
-  document.getElementById('dealer-search-form')?.addEventListener('submit', (e) => {
+  document.getElementById('contact-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    renderDealerResults(document.getElementById('dealer-search-input').value);
+    const name = document.getElementById('contact-name').value;
+    const email = document.getElementById('contact-email').value;
+    const message = document.getElementById('contact-message').value;
+    const btn = document.getElementById('contact-submit-btn');
+    const status = document.getElementById('contact-status');
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    status.textContent = '';
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, message }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Could not send message.');
+      status.textContent = 'Thanks — we\'ve received your message and will be in touch shortly.';
+      e.target.reset();
+    } catch (err) {
+      status.textContent = 'Something went wrong sending your message — please WhatsApp us instead: +27 78 031 6138.';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Send Message';
+    }
   });
 </script>
 </body>
