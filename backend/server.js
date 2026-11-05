@@ -31,6 +31,13 @@ const DEFAULT_SETTINGS = {
   footerTerms: 'Prices include 15% VAT and are subject to confirmation of stock availability.',
   bankDetails: '',
   vatNumber: '',
+  // Formal document letterhead (Quotation, and future Invoice/Delivery Note/
+  // etc.) — kept separate from the storefront's brand companyName/tagline.
+  legalName: 'LIFESTYLE CERAMICS (PTY) LTD',
+  legalAddress: '118 Strand Street, Cape Town, Western Cape, South Africa',
+  companyRegNo: '1998/017285/07',
+  landline: '+27 87 147 0677',
+  whatsappNumber: '+27 78 031 6138',
 };
 function loadSettings() {
   if (!fs.existsSync(SETTINGS_JSON)) return { ...DEFAULT_SETTINGS };
@@ -42,6 +49,46 @@ function loadSettings() {
 }
 function saveSettings(settings) {
   fs.writeFileSync(SETTINGS_JSON, JSON.stringify(settings, null, 2));
+}
+
+// --- Formal documents (Quotation now; Invoice/Delivery Note/Credit Note/
+// Purchase Order/Statement are designed for but not built — see handoff). ---
+const FORMAL_DOCS_JSON = '/opt/lifestyle-ceramics/backend/formal-documents.json';
+const FORMAL_SEQ_JSON = '/opt/lifestyle-ceramics/backend/formal-doc-sequences.json';
+const FORMAL_DOCS_DIR = '/opt/lifestyle-ceramics/backend/formal-documents-private';
+const DOCUMENT_ASSETS_DIR = '/opt/lifestyle-ceramics/backend/document-assets';
+if (!fs.existsSync(FORMAL_DOCS_DIR)) fs.mkdirSync(FORMAL_DOCS_DIR, { recursive: true });
+
+function loadFormalDocs() {
+  if (!fs.existsSync(FORMAL_DOCS_JSON)) return [];
+  try { return JSON.parse(fs.readFileSync(FORMAL_DOCS_JSON, 'utf8')); } catch { return []; }
+}
+function saveFormalDocs(docs) {
+  fs.writeFileSync(FORMAL_DOCS_JSON, JSON.stringify(docs, null, 2));
+}
+
+// One running sequence per document type per calendar year, atomic via
+// synchronous read-modify-write (single-process Node, no concurrent writers).
+function nextFormalDocNumber(typePrefix) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const key = `${typePrefix}-${year}`;
+  let seq = {};
+  if (fs.existsSync(FORMAL_SEQ_JSON)) {
+    try { seq = JSON.parse(fs.readFileSync(FORMAL_SEQ_JSON, 'utf8')); } catch { seq = {}; }
+  }
+  seq[key] = (seq[key] || 0) + 1;
+  fs.writeFileSync(FORMAL_SEQ_JSON, JSON.stringify(seq, null, 2));
+  const running = String(seq[key]).padStart(4, '0');
+  return `LC-${typePrefix}-${year}-${month}-${running}`;
+}
+
+// Matches the sample's "R 1,900.00" formatting exactly (comma thousands,
+// period decimal) — not en-ZA's actual convention (space/comma), which the
+// sample template doesn't follow.
+function money(n) {
+  return 'R ' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // --- Reply templates (reusable canned replies, with {{name}} etc. tokens) ---
@@ -923,6 +970,211 @@ function nextDocNumber(prefix) {
   return `${prefix}-${stamp}-${rand}`;
 }
 
+// Formal Quotation PDF — matches the client-supplied sample (see
+// claude-code-handoff/QUOTATION-HANDOFF.md) structurally: header with logo,
+// Bill To + info box, item table, terms box, footer table, and a bottom row
+// of stamp / release notice / totals. Built generically enough that future
+// document types (Invoice, Delivery Note, etc.) can reuse this shell with a
+// different title/columns/terms per the handoff's section 11.
+const PAGE_W = 595.28, PAGE_H = 841.89, MARGIN = 40;
+const CONTENT_W = PAGE_W - MARGIN * 2;
+const NAVY = '#14263F', BLUE = '#2E86C1', GREY = '#D0D0D0', LIGHT_GREY = '#F2F2F2';
+
+function buildQuotationPdf(quote) {
+  const settings = loadSettings();
+  const filename = `quotation-${quote.docNumber}.pdf`;
+  const filePath = path.join(FORMAL_DOCS_DIR, filename);
+  const doc = new PDFDocument({ size: 'A4', margin: MARGIN });
+  const stream = fs.createWriteStream(filePath);
+  doc.pipe(stream);
+
+  // ---- Header ----
+  let y = MARGIN;
+  doc.fontSize(14).fillColor(NAVY).font('Helvetica-Bold').text(settings.legalName, MARGIN, y, { width: 340 });
+  y = doc.y + 2;
+  doc.fontSize(9).font('Helvetica').fillColor('#000');
+  doc.text(settings.legalAddress, MARGIN, y, { width: 340 });
+  doc.text(`Email: ${settings.companyEmail || process.env.LSC_SMTP_USER}`, MARGIN, doc.y, { width: 340 });
+  doc.text(`Tel: ${settings.landline} | WhatsApp: ${settings.whatsappNumber}`, MARGIN, doc.y, { width: 340 });
+  doc.text(`VAT Reg No: ${settings.vatNumber} | Reg No: ${settings.companyRegNo}`, MARGIN, doc.y, { width: 340 });
+
+  const logoPath = path.join(DOCUMENT_ASSETS_DIR, 'logo.png');
+  if (fs.existsSync(logoPath)) {
+    try { doc.image(logoPath, MARGIN + 350, MARGIN, { width: 150 }); } catch { /* skip if unreadable */ }
+  }
+
+  y = Math.max(doc.y, MARGIN + 60) + 10;
+  doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).strokeColor(NAVY).lineWidth(1.2).stroke();
+  y += 16;
+
+  // ---- Title + Document Number ----
+  doc.fontSize(24).font('Helvetica-Bold').fillColor('#000').text('Quotation', MARGIN, y);
+  doc.fontSize(11).font('Helvetica-Bold').text('Document Number:', MARGIN + 260, y + 6, { continued: true })
+    .font('Helvetica').text(`  ${quote.docNumber}`);
+  y = doc.y + 14;
+
+  // ---- Bill To (left) + Info box (right) ----
+  const billToTop = y;
+  doc.fontSize(10).font('Helvetica-Bold').fillColor('#000').text('Bill To:', MARGIN, y);
+  y = doc.y + 2;
+  doc.fontSize(9).font('Helvetica');
+  [
+    ['Customer Name:', quote.customerName],
+    ['Company Name:', quote.customerCompany],
+    ['Phone:', quote.customerPhone],
+    ['Email:', quote.customerEmail],
+  ].forEach(([label, value]) => {
+    doc.font('Helvetica-Bold').text(label, MARGIN, doc.y, { continued: true, width: 280 })
+      .font('Helvetica').text(' ' + (value || ''));
+  });
+
+  const infoBoxX = MARGIN + 290;
+  const infoBoxW = CONTENT_W - 290;
+  const infoRows = [
+    ['Date:', quote.date],
+    ['Account:', quote.account || ''],
+    ['VAT Reg No:', quote.customerVatNo || ''],
+    ['Ref No:', quote.refNo || ''],
+  ];
+  let rowY = billToTop - 4;
+  const rowH = 18;
+  infoRows.forEach(([label, value], i) => {
+    doc.rect(infoBoxX, rowY, infoBoxW, rowH).fillColor(i % 2 === 0 ? '#fff' : LIGHT_GREY).fill();
+    doc.fontSize(9).fillColor('#000').font('Helvetica-Bold').text(label, infoBoxX + 8, rowY + 5, { width: 90 });
+    doc.font('Helvetica').text(String(value), infoBoxX + 100, rowY + 5, { width: infoBoxW - 110, align: 'right' });
+    rowY += rowH;
+  });
+  doc.rect(infoBoxX, billToTop - 4, infoBoxW, rowH * infoRows.length).strokeColor(GREY).lineWidth(0.5).stroke();
+
+  y = Math.max(doc.y, rowY) + 18;
+
+  // ---- Intro line ----
+  doc.fontSize(10).font('Helvetica-Bold').fillColor('#000')
+    .text('Dear Customer, we take pleasure in quoting you for the following products:', MARGIN, y, { width: CONTENT_W, align: 'center' });
+  y = doc.y + 14;
+
+  // ---- Item table ----
+  const cols = { code: MARGIN, desc: MARGIN + 55, qty: MARGIN + 320, unit: MARGIN + 360, total: MARGIN + 440 };
+  doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(GREY).fill();
+  doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#000');
+  doc.text('CODE', cols.code + 4, y + 5);
+  doc.text('DESCRIPTION', cols.desc, y + 5);
+  doc.text('QTY', cols.qty, y + 5, { width: 40, align: 'right' });
+  doc.text('UNIT PRICE', cols.unit, y + 5, { width: 80, align: 'right' });
+  doc.text('TOTAL', cols.total, y + 5, { width: CONTENT_W - (cols.total - MARGIN), align: 'right' });
+  y += 22;
+
+  let subtotal = 0;
+  (quote.items || []).forEach((it) => {
+    const qty = Number(it.qty) || 0;
+    const unitPrice = Number(it.unitPrice) || 0;
+    const lineTotal = qty * unitPrice;
+    subtotal += lineTotal;
+
+    doc.fontSize(9).font('Helvetica').fillColor('#000');
+    const descLines = [it.description || it.name || ''];
+    if (it.manufacturerCode) descLines.push(`Manufacturer Code: ${it.manufacturerCode}`);
+    if (it.notes) descLines.push(it.notes);
+
+    doc.text(it.code || '', cols.code + 4, y, { width: 50 });
+    doc.text(descLines.join('\n'), cols.desc, y, { width: 265 });
+    const rowTop = y;
+    doc.text(String(qty), cols.qty, rowTop, { width: 40, align: 'right' });
+    doc.text(money(unitPrice), cols.unit, rowTop, { width: 80, align: 'right' });
+    doc.text(money(lineTotal), cols.total, rowTop, { width: CONTENT_W - (cols.total - MARGIN), align: 'right' });
+
+    y = Math.max(doc.y, rowTop + 14) + 8;
+  });
+
+  const vat = subtotal * (Number(quote.vatRate ?? 0.15));
+  const discountRate = Number(quote.discountRate) || 0;
+  const discount = (subtotal + vat) * (discountRate / 100);
+  const total = subtotal + vat - discount;
+
+  y += 10;
+
+  // ---- Terms box ----
+  // Dedicated legal wording for this document type — deliberately NOT the
+  // storefront's generic footerTerms setting (different purpose/audience).
+  const DEFAULT_QUOTATION_TERMS = "QUOTATIONS ARE SUBJECT TO EXCHANGE RATE FLUCTUATIONS. ALL GOODS ARE SUPPLIED IN TERMS OF OUR STANDARD TERMS AND CONDITIONS OF SALE WHICH ARE AVAILABLE ON OUR WEBSITE AND/OR ON REQUEST.\nTHIS IS NOT A TAX INVOICE. NO GOODS MAY BE PICKED OR SUPPLIED ON THIS QUOTATION.\nA TAX INVOICE MUST BE SUPPLIED FOR ALL GOODS COLLECTED.\nE&OE";
+  const termsText = quote.termsText || settings.quotationTerms || DEFAULT_QUOTATION_TERMS;
+  const termsTop = y;
+  doc.fontSize(7.5).font('Helvetica').fillColor('#000').text(termsText, MARGIN + 10, y + 8, { width: CONTENT_W - 20, align: 'center' });
+  const termsBottom = doc.y + 8;
+  doc.rect(MARGIN, termsTop, CONTENT_W, termsBottom - termsTop).strokeColor('#000').lineWidth(1).stroke();
+  y = termsBottom + 10;
+
+  // ---- Footer table ----
+  const footCols = [
+    ['CREATED BY', quote.createdBy || ''],
+    ['LAST OPERATOR', quote.lastOperator || quote.createdBy || ''],
+    ['ACCOUNT REP', quote.accountRep || ''],
+    ['WEIGHT', `${quote.totalWeight || 0}KG`],
+    ['INTERNAL REF', quote.internalRef || ''],
+    ['PAGE', '1'],
+  ];
+  const footColW = CONTENT_W / footCols.length;
+  doc.rect(MARGIN, y, CONTENT_W, 16).fillColor(LIGHT_GREY).fill();
+  footCols.forEach(([label], i) => {
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#000').text(label, MARGIN + i * footColW + 4, y + 4, { width: footColW - 8 });
+  });
+  y += 16;
+  doc.rect(MARGIN, y, CONTENT_W, 16).strokeColor(GREY).lineWidth(0.5).stroke();
+  footCols.forEach(([, value], i) => {
+    doc.fontSize(8).font('Helvetica').fillColor('#000').text(String(value), MARGIN + i * footColW + 4, y + 4, { width: footColW - 8 });
+  });
+  footCols.forEach((_, i) => {
+    if (i === 0) return;
+    doc.moveTo(MARGIN + i * footColW, y).lineTo(MARGIN + i * footColW, y + 16).strokeColor(GREY).lineWidth(0.5).stroke();
+  });
+  y += 26;
+
+  // ---- Bottom row: stamp / release notice / totals ----
+  const bottomTop = y;
+  const stampPath = path.join(DOCUMENT_ASSETS_DIR, 'stamp-blue-tilted.png');
+  if (quote.status !== 'draft' && fs.existsSync(stampPath)) {
+    try { doc.image(stampPath, MARGIN, bottomTop, { width: 110 }); } catch { /* skip if unreadable */ }
+  }
+
+  const noticeX = MARGIN + 150, noticeW = 185;
+  doc.rect(noticeX, bottomTop, noticeW, 80).strokeColor('#000').lineWidth(1).stroke();
+  doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#000').text(
+    "GOODS WILL NOT BE RELEASED UNTIL EFT'S AND DEPOSITS ARE REFLECTED ON LIFESTYLE CERAMICS' BANK STATEMENT",
+    noticeX + 8, bottomTop + 8, { width: noticeW - 16, align: 'center' }
+  );
+  doc.fontSize(7.5).font('Helvetica-Bold').text('Please note this is not a VAT Invoice', noticeX + 8, doc.y + 8, { width: noticeW - 16, align: 'center' });
+  doc.font('Helvetica-Bold').text('Quote expires in 30 Days', noticeX + 8, doc.y + 4, { width: noticeW - 16, align: 'center' });
+
+  const totalsX = noticeX + noticeW + 12;
+  const totalsW = PAGE_W - MARGIN - totalsX;
+  const totalsRows = [
+    ['Total Excl Vat', 'ZAR', money(subtotal)],
+    ['Vat', 'ZAR', money(vat)],
+    ['Discount', `${discountRate}%`, money(discount)],
+    ['Total', 'ZAR', money(total)],
+  ];
+  let totalsY = bottomTop + 4;
+  totalsRows.forEach(([label, mid, value]) => {
+    const bold = label === 'Total';
+    doc.fontSize(bold ? 10 : 9).font(bold ? 'Helvetica-Bold' : 'Helvetica').fillColor('#000');
+    doc.text(label, totalsX, totalsY, { width: 68 });
+    doc.text(mid, totalsX + 70, totalsY, { width: 30 });
+    doc.text(value, totalsX + 100, totalsY, { width: totalsW - 100, align: 'right' });
+    totalsY += bold ? 20 : 16;
+  });
+
+  doc.end();
+
+  return {
+    filePath, filename,
+    totals: { subtotal, vat, discount, discountRate, total },
+    streamPromise: new Promise((resolve, reject) => {
+      stream.on('finish', resolve);
+      stream.on('error', reject);
+    }),
+  };
+}
+
 // Shared layout for Invoice/Receipt PDFs — mirrors the existing Quote PDF
 // styling, pulling company branding from settings.json.
 function buildDocumentPdf({ docType, docNumber, name, email, phone, company, items, grandTotal, extraLines, refNumber }) {
@@ -1535,6 +1787,162 @@ app.post('/contact', async (req, res) => {
     console.error('Contact form error:', err);
     res.status(500).json({ ok: false, error: 'Could not send message.' });
   }
+});
+
+// --- Formal Quotations (numbered LC-QT-YYYY-MM-NNNN documents) ---
+app.get('/admin/formal-quotes', requireAdmin, (req, res) => {
+  res.json({ ok: true, quotes: loadFormalDocs().filter((d) => d.type === 'QT').reverse() });
+});
+
+app.post('/admin/formal-quotes', requireAdmin, (req, res) => {
+  const b = req.body || {};
+  if (!b.customerName || !Array.isArray(b.items) || b.items.length === 0) {
+    return res.status(400).json({ ok: false, error: 'Missing customerName or items.' });
+  }
+  const docs = loadFormalDocs();
+  const nextId = docs.reduce((max, d) => Math.max(max, d.id || 0), 0) + 1;
+  const totalWeight = b.items.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 0), 0);
+
+  const quote = {
+    id: nextId,
+    type: 'QT',
+    status: 'draft',
+    docNumber: null,
+    revision: 0,
+    parentDocumentId: b.parentDocumentId || null,
+    date: new Date().toISOString().slice(0, 10),
+    customerName: b.customerName,
+    customerCompany: b.customerCompany || '',
+    customerPhone: b.customerPhone || '',
+    customerEmail: b.customerEmail || '',
+    account: b.account || '',
+    customerVatNo: b.customerVatNo || '',
+    refNo: b.refNo || '',
+    discountRate: Number(b.discountRate) || 0,
+    vatRate: Number(b.vatRate ?? 0.15),
+    items: b.items,
+    totalWeight,
+    accountRep: b.accountRep || '',
+    notes: b.notes || '',
+    createdBy: req.adminUser,
+    lastOperator: req.adminUser,
+    createdAt: new Date().toISOString(),
+  };
+  docs.push(quote);
+  saveFormalDocs(docs);
+  logActivity(req.adminUser, 'created_formal_quote', `draft #${nextId} for ${quote.customerName}`);
+  res.json({ ok: true, quote });
+});
+
+app.put('/admin/formal-quotes/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const docs = loadFormalDocs();
+  const idx = docs.findIndex((d) => d.id === id);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+  if (docs[idx].status !== 'draft') {
+    return res.status(400).json({ ok: false, error: 'Only draft quotes can be edited directly — issue a revision instead.' });
+  }
+  const b = req.body || {};
+  const totalWeight = Array.isArray(b.items)
+    ? b.items.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 0), 0)
+    : docs[idx].totalWeight;
+  docs[idx] = { ...docs[idx], ...b, totalWeight, lastOperator: req.adminUser, id, type: 'QT' };
+  saveFormalDocs(docs);
+  logActivity(req.adminUser, 'edited_formal_quote', `#${id}`);
+  res.json({ ok: true, quote: docs[idx] });
+});
+
+// Locks in a document number, generates the PDF (with stamp), and marks the
+// quote 'sent'-ready (status becomes 'issued' until actually emailed).
+app.post('/admin/formal-quotes/:id/issue', requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const docs = loadFormalDocs();
+    const idx = docs.findIndex((d) => d.id === id);
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+
+    const quote = docs[idx];
+    if (!quote.docNumber) {
+      quote.docNumber = nextFormalDocNumber('QT');
+      quote.internalRef = quote.docNumber.split('-').pop();
+    }
+    quote.status = 'issued';
+    quote.lastOperator = req.adminUser;
+    quote.issuedAt = new Date().toISOString();
+
+    const { filePath, totals, streamPromise } = buildQuotationPdf(quote);
+    await streamPromise;
+    quote.pdfPath = filePath;
+    quote.totals = totals;
+
+    docs[idx] = quote;
+    saveFormalDocs(docs);
+    logActivity(req.adminUser, 'issued_formal_quote', quote.docNumber);
+    res.json({ ok: true, quote });
+  } catch (err) {
+    console.error('Issue formal quote error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/admin/formal-quotes/:id/pdf', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const quote = loadFormalDocs().find((d) => d.id === id);
+  if (!quote || !quote.pdfPath || !fs.existsSync(quote.pdfPath)) {
+    return res.status(404).json({ ok: false, error: 'PDF not generated yet — issue the quote first.' });
+  }
+  res.download(quote.pdfPath, path.basename(quote.pdfPath));
+});
+
+app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const docs = loadFormalDocs();
+    const idx = docs.findIndex((d) => d.id === id);
+    if (idx === -1) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+    const quote = docs[idx];
+    if (!quote.pdfPath || !fs.existsSync(quote.pdfPath)) {
+      return res.status(400).json({ ok: false, error: 'Issue the quote (generate its PDF) before sending.' });
+    }
+    if (!quote.customerEmail) {
+      return res.status(400).json({ ok: false, error: 'This quote has no customer email on file.' });
+    }
+    const settings = loadSettings();
+
+    await mailer.sendMail({
+      from: `"${settings.legalName}" <${process.env.LSC_SMTP_USER}>`,
+      to: quote.customerEmail,
+      subject: `Your Quotation ${quote.docNumber} — ${settings.legalName}`,
+      text: `Hi ${quote.customerName},\n\nPlease find your itemised quotation attached (${quote.docNumber}).\n\nThis quotation is valid for 30 days.\n\nKind regards,\n${settings.legalName}`,
+      attachments: [{ filename: path.basename(quote.pdfPath), path: quote.pdfPath }],
+    });
+
+    quote.status = 'sent';
+    quote.sentAt = new Date().toISOString();
+    docs[idx] = quote;
+    saveFormalDocs(docs);
+    logActivity(req.adminUser, 'sent_formal_quote', `${quote.docNumber} to ${quote.customerEmail}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Send formal quote error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.delete('/admin/formal-quotes/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const docs = loadFormalDocs();
+  const quote = docs.find((d) => d.id === id);
+  if (!quote) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+  if (quote.status === 'draft') {
+    saveFormalDocs(docs.filter((d) => d.id !== id));
+  } else {
+    // Numbered documents are never deleted — void keeps the number reserved.
+    quote.status = 'void';
+    saveFormalDocs(docs);
+  }
+  logActivity(req.adminUser, 'removed_formal_quote', String(id));
+  res.json({ ok: true });
 });
 
 app.get('/health', (req, res) => res.json({ ok: true }));

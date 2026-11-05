@@ -233,6 +233,7 @@
 
         <div class="sidebar-group-label">Sales</div>
         <button class="nav-item" id="ptab-quotes" onclick="switchPanel('quotes')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h6"/></svg><span>Quotes</span></button>
+        <button class="nav-item" id="ptab-formalquotes" onclick="switchPanel('formalquotes')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><circle cx="9" cy="14" r="1"/><path d="M12 14h3M9 17h6"/></svg><span>Formal Quotes</span></button>
         <button class="nav-item" id="ptab-clients" onclick="switchPanel('clients')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3.1-6 7-6s7 2 7 6"/><circle cx="17" cy="8" r="3"/><path d="M22 21c0-3.3-2-5.3-4.5-5.9"/></svg><span>Clients</span></button>
         <button class="nav-item" id="ptab-documents" onclick="switchPanel('documents')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/></svg><span>Documents</span></button>
 
@@ -353,6 +354,20 @@
       </section>
     </div>
 
+    <div class="panel" id="panel-formalquotes">
+      <section>
+        <div class="section-head">
+          <h2 style="font-size:16px;margin:0;">Formal Quotations</h2>
+          <button class="btn" onclick="openFormalQuoteForm()">+ New Quotation</button>
+        </div>
+        <p class="muted" style="margin-top:0;">Numbered, typeset quotation documents (LC-QT-YYYY-MM-NNNN) — separate from the website's Quote Requests above, which are inbound leads.</p>
+        <table id="formal-quotes-table">
+          <thead><tr><th>Doc #</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+
     <div class="panel" id="panel-clients">
       <section>
         <h2 style="font-size:16px;">Clients</h2>
@@ -461,6 +476,45 @@
       </div>
     </main>
     <div class="sidebar-scrim" onclick="toggleSidebar(false)"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="formal-quote-modal">
+  <div class="modal" style="max-width:720px;">
+    <h3 id="fq-modal-title">New Quotation</h3>
+    <input type="hidden" id="fq-id">
+    <div class="form-grid-2">
+      <div class="form-row"><label>Customer Name *</label><input type="text" id="fq-customerName"></div>
+      <div class="form-row"><label>Company Name</label><input type="text" id="fq-customerCompany"></div>
+    </div>
+    <div class="form-grid-2">
+      <div class="form-row"><label>Phone</label><input type="text" id="fq-customerPhone"></div>
+      <div class="form-row"><label>Email</label><input type="email" id="fq-customerEmail"></div>
+    </div>
+    <div class="form-grid-2">
+      <div class="form-row"><label>Account</label><input type="text" id="fq-account"></div>
+      <div class="form-row"><label>Customer VAT Reg No</label><input type="text" id="fq-customerVatNo"></div>
+    </div>
+    <div class="form-grid-2">
+      <div class="form-row"><label>Ref No (customer's own PO ref)</label><input type="text" id="fq-refNo"></div>
+      <div class="form-row"><label>Account Rep (code)</label><input type="text" id="fq-accountRep" placeholder="e.g. ON01"></div>
+    </div>
+    <div class="form-row"><label>Discount % (applied to VAT-inclusive subtotal)</label><input type="number" step="0.01" id="fq-discountRate" value="0"></div>
+
+    <div class="form-row">
+      <label>Line Items</label>
+      <table id="fq-items-table" style="margin-bottom:8px;">
+        <thead><tr><th>Code</th><th>Description</th><th>Mfr Code</th><th>Qty</th><th>Unit Price (ZAR)</th><th>Weight (kg, each)</th><th></th></tr></thead>
+        <tbody id="fq-items-tbody"></tbody>
+      </table>
+      <button type="button" class="btn-outline-sm" onclick="addFormalQuoteItemRow()">+ Add Line Item</button>
+    </div>
+
+    <p class="muted" id="formal-quote-status"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeFormalQuoteForm()">Cancel</button>
+      <button class="btn" onclick="saveFormalQuote()">Save Draft</button>
+    </div>
   </div>
 </div>
 
@@ -942,10 +996,10 @@
   }
 
   // ---------- Panel tabs ----------
-  const PANEL_NAMES = ['overview', 'email', 'products', 'stock', 'quotes', 'clients', 'documents', 'visitors', 'activity', 'users', 'settings'];
+  const PANEL_NAMES = ['overview', 'email', 'products', 'stock', 'quotes', 'formalquotes', 'clients', 'documents', 'visitors', 'activity', 'users', 'settings'];
   const PANEL_TITLES = {
     overview: 'Dashboard', email: 'Email', products: 'Products', stock: 'Stock Control',
-    quotes: 'Quote Requests', clients: 'Clients', documents: 'Documents',
+    quotes: 'Quote Requests', formalquotes: 'Formal Quotations', clients: 'Clients', documents: 'Documents',
     visitors: 'Visitors', activity: 'Activity Log', users: 'Admin Users', settings: 'Settings',
   };
   const OWNER_ONLY_PANELS = ['activity', 'users', 'settings'];
@@ -959,6 +1013,7 @@
     });
     document.getElementById('topbar-title').textContent = PANEL_TITLES[name] || 'Dashboard';
     if (name === 'stock') loadStock();
+    if (name === 'formalquotes') loadFormalQuotes();
     if (name === 'clients') loadClients();
     if (name === 'documents') loadDocuments();
     if (name === 'settings') loadSettingsForm();
@@ -1592,6 +1647,182 @@
       .then((data) => {
         document.getElementById('client-notes-status').textContent = data.ok ? 'Saved.' : 'Error saving.';
       });
+  }
+
+  // ---------- Formal Quotations (numbered LC-QT documents) ----------
+  let currentFormalQuotes = [];
+  let fqItemRowCount = 0;
+
+  function loadFormalQuotes() {
+    fetch('/api/admin/formal-quotes?' + authQS(), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        currentFormalQuotes = data.quotes || [];
+        document.querySelector('#formal-quotes-table tbody').innerHTML = currentFormalQuotes.map((q) => {
+          const total = q.totals ? fmtZAR(q.totals.total) : '—';
+          const canEdit = q.status === 'draft';
+          const canIssue = q.status === 'draft';
+          const canSend = q.status === 'issued';
+          return `<tr>
+            <td>${q.docNumber || '(unissued draft)'}</td>
+            <td>${q.customerName}${q.customerCompany ? '<br><span class="muted">' + q.customerCompany + '</span>' : ''}</td>
+            <td>${q.date}</td>
+            <td>${total}</td>
+            <td><span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status}</span></td>
+            <td>
+              ${canEdit ? `<button class="btn-outline-sm" onclick="openFormalQuoteForm(${q.id})">Edit</button>` : ''}
+              ${canIssue ? `<button class="btn-outline-sm" onclick="issueFormalQuote(${q.id}, this)">Issue PDF</button>` : ''}
+              ${q.pdfPath ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;" href="/api/admin/formal-quotes/${q.id}/pdf?${authQS()}" target="_blank">Download</a>` : ''}
+              ${canSend ? `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendFormalQuote(${q.id}, this)">Send</button>` : ''}
+              ${q.status !== 'void' ? `<button class="btn-danger-sm" onclick="removeFormalQuote(${q.id})">${q.status === 'draft' ? 'Delete' : 'Void'}</button>` : ''}
+            </td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="6" class="muted">No formal quotations yet</td></tr>';
+      });
+  }
+
+  function addFormalQuoteItemRow(item) {
+    const i = fqItemRowCount++;
+    const it = item || {};
+    const tbody = document.getElementById('fq-items-tbody');
+    const row = document.createElement('tr');
+    row.id = 'fq-item-row-' + i;
+    row.innerHTML = `
+      <td><input type="text" id="fq-item-code-${i}" value="${it.code || ''}" style="width:60px;"></td>
+      <td><input type="text" id="fq-item-desc-${i}" value="${it.description || ''}" style="width:160px;"></td>
+      <td><input type="text" id="fq-item-mfr-${i}" value="${it.manufacturerCode || ''}" style="width:90px;"></td>
+      <td><input type="number" id="fq-item-qty-${i}" value="${it.qty || 1}" style="width:50px;"></td>
+      <td><input type="number" step="0.01" id="fq-item-price-${i}" value="${it.unitPrice || ''}" style="width:90px;"></td>
+      <td><input type="number" step="0.01" id="fq-item-weight-${i}" value="${it.weight || 0}" style="width:70px;"></td>
+      <td><button type="button" class="btn-danger-sm" onclick="document.getElementById('fq-item-row-${i}').remove()">×</button></td>
+    `;
+    tbody.appendChild(row);
+  }
+
+  function collectFormalQuoteItems() {
+    return [...document.querySelectorAll('#fq-items-tbody tr')].map((row) => {
+      const i = row.id.replace('fq-item-row-', '');
+      return {
+        code: document.getElementById(`fq-item-code-${i}`).value,
+        description: document.getElementById(`fq-item-desc-${i}`).value,
+        manufacturerCode: document.getElementById(`fq-item-mfr-${i}`).value,
+        qty: Number(document.getElementById(`fq-item-qty-${i}`).value) || 0,
+        unitPrice: Number(document.getElementById(`fq-item-price-${i}`).value) || 0,
+        weight: Number(document.getElementById(`fq-item-weight-${i}`).value) || 0,
+      };
+    }).filter((it) => it.description || it.code);
+  }
+
+  function openFormalQuoteForm(id) {
+    const q = id ? currentFormalQuotes.find((x) => x.id === id) : null;
+    document.getElementById('fq-modal-title').textContent = q ? 'Edit Quotation (draft)' : 'New Quotation';
+    document.getElementById('fq-id').value = q ? q.id : '';
+    document.getElementById('fq-customerName').value = q ? q.customerName : '';
+    document.getElementById('fq-customerCompany').value = q ? q.customerCompany : '';
+    document.getElementById('fq-customerPhone').value = q ? q.customerPhone : '';
+    document.getElementById('fq-customerEmail').value = q ? q.customerEmail : '';
+    document.getElementById('fq-account').value = q ? q.account : '';
+    document.getElementById('fq-customerVatNo').value = q ? q.customerVatNo : '';
+    document.getElementById('fq-refNo').value = q ? q.refNo : '';
+    document.getElementById('fq-accountRep').value = q ? q.accountRep : '';
+    document.getElementById('fq-discountRate').value = q ? q.discountRate : 0;
+    document.getElementById('fq-items-tbody').innerHTML = '';
+    fqItemRowCount = 0;
+    if (q && q.items && q.items.length) {
+      q.items.forEach((it) => addFormalQuoteItemRow(it));
+    } else {
+      addFormalQuoteItemRow();
+    }
+    document.getElementById('formal-quote-status').textContent = '';
+    document.getElementById('formal-quote-modal').classList.add('open');
+  }
+
+  function closeFormalQuoteForm() {
+    document.getElementById('formal-quote-modal').classList.remove('open');
+  }
+
+  function saveFormalQuote() {
+    const id = document.getElementById('fq-id').value;
+    const payload = {
+      customerName: document.getElementById('fq-customerName').value.trim(),
+      customerCompany: document.getElementById('fq-customerCompany').value.trim(),
+      customerPhone: document.getElementById('fq-customerPhone').value.trim(),
+      customerEmail: document.getElementById('fq-customerEmail').value.trim(),
+      account: document.getElementById('fq-account').value.trim(),
+      customerVatNo: document.getElementById('fq-customerVatNo').value.trim(),
+      refNo: document.getElementById('fq-refNo').value.trim(),
+      accountRep: document.getElementById('fq-accountRep').value.trim(),
+      discountRate: Number(document.getElementById('fq-discountRate').value) || 0,
+      items: collectFormalQuoteItems(),
+    };
+    if (!payload.customerName || payload.items.length === 0) {
+      document.getElementById('formal-quote-status').textContent = 'Customer name and at least one line item are required.';
+      return;
+    }
+    const url = '/api/admin/formal-quotes' + (id ? '/' + id : '') + '?' + authQS();
+    fetch(url, {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        closeFormalQuoteForm();
+        loadFormalQuotes();
+        showMailToast('Quotation draft saved.');
+      })
+      .catch((err) => {
+        document.getElementById('formal-quote-status').textContent = 'Error: ' + err.message;
+      });
+  }
+
+  function issueFormalQuote(id, btn) {
+    if (!confirm('Issue this quotation? This locks in its document number and generates the final PDF.')) return;
+    btn.disabled = true;
+    btn.textContent = 'Issuing...';
+    fetch('/api/admin/formal-quotes/' + id + '/issue?' + authQS(), { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        showMailToast('Quotation issued: ' + data.quote.docNumber);
+        loadFormalQuotes();
+      })
+      .catch((err) => {
+        btn.disabled = false;
+        btn.textContent = 'Issue PDF';
+        alert('Could not issue: ' + err.message);
+      });
+  }
+
+  function sendFormalQuote(id, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    fetch('/api/admin/formal-quotes/' + id + '/send?' + authQS(), { method: 'POST' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        showMailToast('Quotation sent to client.');
+        loadFormalQuotes();
+      })
+      .catch((err) => {
+        btn.disabled = false;
+        btn.textContent = 'Send';
+        alert('Could not send: ' + err.message);
+      });
+  }
+
+  function removeFormalQuote(id) {
+    const q = currentFormalQuotes.find((x) => x.id === id);
+    const msg = q && q.status === 'draft' ? 'Delete this draft?' : 'Void this quotation? Its number stays reserved and cannot be reused.';
+    if (!confirm(msg)) return;
+    fetch('/api/admin/formal-quotes/' + id + '?' + authQS(), { method: 'DELETE' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        loadFormalQuotes();
+      })
+      .catch((err) => alert('Could not remove: ' + err.message));
   }
 
   // ---------- Documents (Invoices & Receipts) ----------
