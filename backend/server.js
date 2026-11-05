@@ -297,7 +297,12 @@ app.get('/analytics', requireAdmin, (req, res) => {
   const formalDocsById = new Map(loadFormalDocs().map((d) => [d.id, d]));
   const quotes = [...quotesByNumber.values()].map((q) => {
     const formalDoc = q.formalQuoteId ? formalDocsById.get(q.formalQuoteId) : null;
-    return { ...q, emailOpenedAt: formalDoc ? formalDoc.emailOpenedAt || null : null };
+    return {
+      ...q,
+      emailOpenedAt: formalDoc ? formalDoc.emailOpenedAt || null : null,
+      rapidDuplicate: formalDoc ? !!formalDoc.rapidDuplicate : false,
+      possibleDuplicateOf: formalDoc ? formalDoc.possibleDuplicateOf || null : null,
+    };
   });
 
   const now = Date.now();
@@ -400,6 +405,12 @@ app.post('/quote', (req, res) => {
     // quote on file, so staff can spot duplicate submissions and decide
     // whether to work the existing one instead of creating a fresh draft.
     const existingActiveQuote = docs.find((d) => d.status !== 'void' && String(d.customerEmail || '').toLowerCase() === String(email).toLowerCase());
+    // A repeat within minutes is almost always an accidental double-submit
+    // (e.g. clicking Submit twice) rather than a genuinely separate
+    // inquiry — flagged more urgently than an older repeat request.
+    const RAPID_DUPLICATE_WINDOW_MS = 15 * 60 * 1000;
+    const isRapidDuplicate = existingActiveQuote
+      && (Date.now() - new Date(existingActiveQuote.createdAt || existingActiveQuote.date).getTime()) <= RAPID_DUPLICATE_WINDOW_MS;
 
     const formalQuote = {
       id: nextId,
@@ -427,6 +438,7 @@ app.post('/quote', (req, res) => {
       createdAt: new Date().toISOString(),
       sourceQuoteNumber: quoteNumber,
       possibleDuplicateOf: existingActiveQuote ? existingActiveQuote.id : null,
+      rapidDuplicate: isRapidDuplicate,
     };
     docs.push(formalQuote);
     saveFormalDocs(docs);
@@ -448,10 +460,12 @@ app.post('/quote', (req, res) => {
     mailer.sendMail({
       from: `"${settings.legalName || settings.companyName} Website" <${process.env.LSC_SMTP_USER}>`,
       to: process.env.LSC_SMTP_USER,
-      subject: `${existingActiveQuote ? '⚠ Possible duplicate — ' : ''}New Quote Request from ${name} (${quoteNumber})`,
+      subject: `${isRapidDuplicate ? '🔴 LIKELY DUPLICATE SUBMIT — ' : existingActiveQuote ? '⚠ Possible duplicate — ' : ''}New Quote Request from ${name} (${quoteNumber})`,
       text: [
         `A new quote request just came in from the website.`,
-        existingActiveQuote ? `⚠ ${name} already has an active quote on file: ${existingActiveQuote.docNumber || '#' + existingActiveQuote.id} (${existingActiveQuote.status}). Check before creating a new one.` : null,
+        isRapidDuplicate
+          ? `🔴 ${name} submitted this within minutes of their last request (${existingActiveQuote.docNumber || '#' + existingActiveQuote.id}) — almost certainly an accidental double-submit (e.g. double-clicking Submit). Check the existing one before working this as a separate request.`
+          : existingActiveQuote ? `⚠ ${name} already has an active quote on file: ${existingActiveQuote.docNumber || '#' + existingActiveQuote.id} (${existingActiveQuote.status}). Check before creating a new one.` : null,
         '',
         `Name: ${name}`,
         `Email: ${email}`,

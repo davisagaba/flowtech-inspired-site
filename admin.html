@@ -1064,7 +1064,7 @@
 
     document.querySelector('#quotes-table tbody').innerHTML = data.quoteRequests
       .map((q) => `<tr class="${q.emailOpenedAt ? 'quote-row-read' : ''}" ${q.emailOpenedAt ? `title="Client opened the quotation email on ${new Date(q.emailOpenedAt).toLocaleString('en-ZA')}"` : ''}>
-        <td>${q.quoteNumber}${q.emailOpenedAt ? ' <span class="pill done">✓ Read</span>' : ''}</td>
+        <td>${q.quoteNumber}${q.emailOpenedAt ? ' <span class="pill done">✓ Read</span>' : ''}${q.rapidDuplicate ? ' <span class="pill" style="background:#fbe0e0;color:#a31515;">🔴 duplicate submit</span>' : (q.possibleDuplicateOf ? ' <span class="pill" style="background:#fdf0d5;color:#8a5f00;">⚠ possible duplicate</span>' : '')}</td>
         <td>${new Date(q.date).toLocaleString('en-ZA')}</td>
         <td>${q.name || ''}</td>
         <td>${q.email || ''}</td>
@@ -1911,7 +1911,9 @@
           const duplicateOf = q.possibleDuplicateOf ? currentFormalQuotes.find((x) => x.id === q.possibleDuplicateOf) : null;
           return `<tr>
             <td>${q.docNumber || '(unissued draft)'}${replaces ? `<br><span class="muted" style="font-size:11px;">replaces ${replaces.docNumber || '#' + replaces.id}</span>` : ''}${replacedBy ? `<br><span class="muted" style="font-size:11px;">replaced by ${replacedBy.docNumber || '#' + replacedBy.id}</span>` : ''}</td>
-            <td>${q.customerName}${q.customerCompany ? '<br><span class="muted">' + q.customerCompany + '</span>' : ''}${duplicateOf && duplicateOf.status !== 'void' ? `<br><span class="pill" style="background:#fdf0d5;color:#8a5f00;">⚠ possible duplicate of ${duplicateOf.docNumber || '#' + duplicateOf.id}</span>` : ''}</td>
+            <td>${q.customerName}${q.customerCompany ? '<br><span class="muted">' + q.customerCompany + '</span>' : ''}${duplicateOf && duplicateOf.status !== 'void' ? (q.rapidDuplicate
+              ? `<br><span class="pill" style="background:#fbe0e0;color:#a31515;">🔴 duplicate submit of ${duplicateOf.docNumber || '#' + duplicateOf.id}</span>`
+              : `<br><span class="pill" style="background:#fdf0d5;color:#8a5f00;">⚠ possible duplicate of ${duplicateOf.docNumber || '#' + duplicateOf.id}</span>`) : ''}</td>
             <td>${q.date}</td>
             <td>${total}</td>
             <td><span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status}</span>${q.emailOpenedAt ? `<br><span class="pill done" style="margin-top:4px;">✓ Read ${q.emailOpenCount > 1 ? '(' + q.emailOpenCount + 'x)' : ''}</span>` : ''}</td>
