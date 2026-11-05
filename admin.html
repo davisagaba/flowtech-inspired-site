@@ -1150,24 +1150,44 @@
     document.getElementById('inbox-unread-badge-nav').textContent = count > 0 ? count : '';
   }
 
+  const MAIL_PAGE_SIZE = 30;
+  let mailOffset = 0;
+  let mailHasMore = true;
+
   function loadMail(folder) {
     const list = document.getElementById('mail-list');
     list.innerHTML = '<div class="mail-empty">Loading…</div>';
+    mailOffset = 0;
+    mailHasMore = true;
+    currentMailMessages = [];
+    fetchMailPage(folder, 0, true);
+  }
+
+  function fetchMailPage(folder, offset, replace) {
     const def = mailFolders.find((f) => f.key === folder);
-    const url = (folder === 'inbox' || folder === 'outbox')
-      ? '/api/admin/mailbox/' + folder + '?' + authQS() + '&limit=30'
-      : '/api/admin/mailbox/folder?path=' + encodeURIComponent((def && def.path) || folder) + '&' + authQS() + '&limit=30';
-    fetch(url, { cache: 'no-store' })
+    const base = (folder === 'inbox' || folder === 'outbox')
+      ? '/api/admin/mailbox/' + folder
+      : '/api/admin/mailbox/folder?path=' + encodeURIComponent((def && def.path) || folder);
+    const sep = base.includes('?') ? '&' : '?';
+    const url = base + sep + authQS() + '&limit=' + MAIL_PAGE_SIZE + '&offset=' + offset;
+    return fetch(url, { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Failed to load mailbox');
-        currentMailMessages = data.messages || [];
+        const page = data.messages || [];
+        mailHasMore = page.length >= MAIL_PAGE_SIZE;
+        currentMailMessages = replace ? page : currentMailMessages.concat(page);
         if (folder === 'inbox') updateUnreadBadge();
         renderMailList();
       })
       .catch((err) => {
-        list.innerHTML = '<div class="mail-empty">Could not load mail: ' + err.message + '</div>';
+        document.getElementById('mail-list').innerHTML = '<div class="mail-empty">Could not load mail: ' + err.message + '</div>';
       });
+  }
+
+  function loadMoreMail() {
+    mailOffset += MAIL_PAGE_SIZE;
+    fetchMailPage(currentMailFolder, mailOffset, false);
   }
 
   function renderMailList() {
@@ -1202,7 +1222,9 @@
           <div class="mail-snippet">${m.snippet || ''}</div>
         </div>
       </div>`;
-    }).join('');
+    }).join('') + (!currentMailSearch && mailHasMore
+      ? '<div style="padding:14px;text-align:center;"><button class="btn-outline-sm" onclick="loadMoreMail()">Load older messages</button></div>'
+      : '');
   }
 
   function openMailMessage(i) {

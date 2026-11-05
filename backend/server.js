@@ -143,7 +143,7 @@ function imapClient() {
 }
 
 // Fetches the most recent messages from a mailbox folder, newest first.
-async function fetchMailbox(folder, limit) {
+async function fetchMailbox(folder, limit, offset = 0) {
   const client = imapClient();
   const messages = [];
   await client.connect();
@@ -153,8 +153,10 @@ async function fetchMailbox(folder, limit) {
       const mailbox = client.mailbox;
       const total = mailbox.exists;
       if (total > 0) {
-        const start = Math.max(1, total - limit + 1);
-        for await (const msg of client.fetch(`${start}:${total}`, { envelope: true, flags: true, source: true })) {
+        const end = Math.max(1, total - offset);
+        const start = Math.max(1, end - limit + 1);
+        if (start > end) return messages;
+        for await (const msg of client.fetch(`${start}:${end}`, { envelope: true, flags: true, source: true })) {
           let snippet = '';
           let body = '';
           let attachments = [];
@@ -1565,7 +1567,8 @@ app.get('/admin/mailbox/folders', requireAdmin, async (req, res) => {
 app.get('/admin/mailbox/inbox', requireAdmin, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 25, 100);
-    const messages = await fetchMailbox('INBOX', limit);
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const messages = await fetchMailbox('INBOX', limit, offset);
     res.json({ ok: true, messages });
   } catch (err) {
     console.error('Inbox fetch error:', err);
@@ -1576,8 +1579,9 @@ app.get('/admin/mailbox/inbox', requireAdmin, async (req, res) => {
 app.get('/admin/mailbox/outbox', requireAdmin, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 25, 100);
+    const offset = Math.max(0, Number(req.query.offset) || 0);
     const folder = await findSentFolder();
-    const messages = await fetchMailbox(folder, limit);
+    const messages = await fetchMailbox(folder, limit, offset);
     res.json({ ok: true, messages, folder });
   } catch (err) {
     console.error('Outbox fetch error:', err);
@@ -1593,7 +1597,8 @@ app.get('/admin/mailbox/folder', requireAdmin, async (req, res) => {
     const path = req.query.path;
     if (!path) return res.status(400).json({ ok: false, error: 'Missing path.' });
     const limit = Math.min(Number(req.query.limit) || 25, 100);
-    const messages = await fetchMailbox(path, limit);
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const messages = await fetchMailbox(path, limit, offset);
     res.json({ ok: true, messages });
   } catch (err) {
     console.error('Folder fetch error:', err);
