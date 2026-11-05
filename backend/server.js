@@ -41,6 +41,9 @@ const DEFAULT_SETTINGS = {
   // Printed as CREATED BY / LAST OPERATOR on every formal document,
   // regardless of which admin account actually issued it.
   documentOperatorName: 'Lebogang Mokoena',
+  salesRepTitle: 'Sales Representative',
+  website: 'lyfestyleceramics.co.za',
+  deliveryTerms: 'Free delivery is included on all orders above R20,000 within South Africa.\nStandard lead time for delivery is 24–48 hours from the date of order.',
 };
 function loadSettings() {
   if (!fs.existsSync(SETTINGS_JSON)) return { ...DEFAULT_SETTINGS };
@@ -1931,12 +1934,37 @@ app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'This quote has no customer email on file.' });
     }
     const settings = loadSettings();
+    const operatorName = settings.documentOperatorName || 'Sales Team';
+    const emailBody = [
+      `Dear ${quote.customerName},`,
+      '',
+      'Please find attached our quotation for your review, including pricing and estimated delivery timelines.',
+      '',
+      'Please note:',
+      ...(settings.deliveryTerms || '').split('\n').map((line) => `- ${line}`),
+      '',
+      "Should you require any clarification or wish to make adjustments, please don't hesitate to get in touch — we're happy to assist.",
+      '',
+      'We look forward to your feedback and the opportunity to work with you.',
+      '',
+      'Kind regards,',
+      '',
+      operatorName,
+      settings.salesRepTitle || '',
+      settings.legalName,
+      '',
+      `Mobile: ${settings.whatsappNumber}`,
+      `Email: ${process.env.LSC_SMTP_USER}`,
+      `Website: ${settings.website}`,
+      '',
+      `This quotation is valid for 30 days from the date of issue and is subject to our standard terms and conditions of sale.`,
+    ].join('\n');
 
     await mailer.sendMail({
       from: `"${settings.legalName}" <${process.env.LSC_SMTP_USER}>`,
       to: quote.customerEmail,
       subject: `Your Quotation ${quote.docNumber} — ${settings.legalName}`,
-      text: `Hi ${quote.customerName},\n\nPlease find your itemised quotation attached (${quote.docNumber}).\n\nThis quotation is valid for 30 days.\n\nKind regards,\n${settings.legalName}`,
+      text: emailBody,
       attachments: [{ filename: path.basename(quote.pdfPath), path: quote.pdfPath }],
     });
 
