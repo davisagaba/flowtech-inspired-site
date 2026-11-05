@@ -1991,6 +1991,7 @@
         if (!data.ok) throw new Error(data.error || 'Failed');
         showMailToast('Quotation issued: ' + data.quote.docNumber);
         loadFormalQuotes();
+        window.open('/api/admin/formal-quotes/' + data.quote.id + '/view?' + authQS(), '_blank');
       })
       .catch((err) => {
         btn.disabled = false;
