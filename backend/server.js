@@ -1021,11 +1021,6 @@ function buildQuotationPdf(quote) {
   doc.fontSize(24).font('Helvetica-Bold').fillColor('#000').text('Quotation', MARGIN, y);
   doc.fontSize(11).font('Helvetica-Bold').text('Document Number:', MARGIN + 260, y + 6, { continued: true })
     .font('Helvetica').text(`  ${quote.docNumber}`);
-  if (quote.replacesDocNumber) {
-    doc.fontSize(8).font('Helvetica-Oblique').fillColor('#555')
-      .text(`Replaces voided quotation ${quote.replacesDocNumber}`, MARGIN + 260, doc.y + 2);
-    doc.fillColor('#000');
-  }
   y = doc.y + 14;
 
   // ---- Bill To (left) + Info box (right) ----
