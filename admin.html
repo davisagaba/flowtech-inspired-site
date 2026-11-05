@@ -1854,6 +1854,7 @@
       <td><button type="button" class="btn-danger-sm" onclick="document.getElementById('fq-item-row-${i}').remove()">×</button></td>
     `;
     tbody.appendChild(row);
+    if (it.code && !it.weight) fillFormalQuoteItemFromCatalog(i);
   }
 
   // Pulls weight (and description, if still blank) from the matching
