@@ -110,8 +110,9 @@
             <table class="specs-table" id="quote-items-table"></table>
             <p class="quote-items-total" id="quote-items-total"></p>
           </div>
-          <label id="qproduct-fallback-wrap" hidden>Product / items you need a quote for
-            <input type="text" id="qproduct" placeholder="e.g. Plural Urinal x2, hand dryer x1" required>
+          <label id="qproduct-fallback-wrap" hidden style="position:relative;">Product / items you need a quote for
+            <input type="text" id="qproduct" placeholder="Start typing a product name…" required autocomplete="off">
+            <div id="qproduct-suggestions" class="qproduct-suggestions" hidden></div>
           </label>
           <label>When do you need this by?
             <select id="qtimeline">
@@ -250,10 +251,62 @@
     fallbackWrap.hidden = false;
   }
 
+  // Type-ahead product search for the fallback field — picking a
+  // suggestion converts the request into a structured line item (with
+  // real pricing) instead of leaving it as free text.
+  const qproductInput = document.getElementById('qproduct');
+  const suggestionsBox = document.getElementById('qproduct-suggestions');
+  let activeSuggestionIndex = -1;
+
+  function renderSuggestions(matches) {
+    activeSuggestionIndex = -1;
+    if (matches.length === 0) {
+      suggestionsBox.hidden = true;
+      suggestionsBox.innerHTML = '';
+      return;
+    }
+    suggestionsBox.innerHTML = matches.map((p, i) => `
+      <div class="qproduct-suggestion" data-i="${i}">
+        <span>${p.name}</span>
+        <span class="qps-code">${p.code || ''}</span>
+      </div>`).join('');
+    suggestionsBox.hidden = false;
+    suggestionsBox.querySelectorAll('.qproduct-suggestion').forEach((el) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        selectQproductSuggestion(matches[Number(el.dataset.i)]);
+      });
+    });
+  }
+
+  function selectQproductSuggestion(product) {
+    quoteItems.push({ id: product.id, qty: 1, product });
+    fallbackWrap.hidden = true;
+    itemsWrap.hidden = false;
+    suggestionsBox.hidden = true;
+    qproductInput.value = '';
+    renderQuoteItems();
+  }
+
+  qproductInput.addEventListener('input', () => {
+    const term = qproductInput.value.trim().toLowerCase();
+    if (term.length < 2 || typeof CATALOG === 'undefined') {
+      renderSuggestions([]);
+      return;
+    }
+    const matches = CATALOG
+      .filter((p) => p.name.toLowerCase().includes(term) || (p.code || '').toLowerCase().includes(term))
+      .slice(0, 8);
+    renderSuggestions(matches);
+  });
+
+  qproductInput.addEventListener('blur', () => {
+    setTimeout(() => { suggestionsBox.hidden = true; }, 100);
+  });
+
   document.getElementById('quote-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('qname').value;
-    const qproductInput = document.getElementById('qproduct');
     if (quoteItems.length === 0 && !qproductInput.value.trim()) {
       qproductInput.focus();
       qproductInput.reportValidity && qproductInput.setCustomValidity('Please tell us which product(s) you need a quote for.');
