@@ -1597,7 +1597,9 @@
   }
 
   // ---------- Compose (new email, modal) ----------
+  let composeForwardIndex = null;
   function openCompose(forwardIndex) {
+    composeForwardIndex = (typeof forwardIndex === 'number') ? forwardIndex : null;
     const fwd = (typeof forwardIndex === 'number') ? currentMailMessages[forwardIndex] : null;
     document.getElementById('compose-modal-title').textContent = fwd ? 'Forward Email' : 'Compose Email';
     document.getElementById('c-in-reply-to').value = '';
@@ -1616,6 +1618,7 @@
     document.getElementById('compose-modal').classList.remove('open');
     document.getElementById('c-formal-quote-id').value = '';
     document.getElementById('c-attachments-row').style.display = 'none';
+    composeForwardIndex = null;
   }
 
   // Opens the compose window pre-filled with the quotation's default email,
@@ -1675,6 +1678,7 @@
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Send failed');
+        const fwd = (composeForwardIndex !== null) ? currentMailMessages[composeForwardIndex] : null;
         closeCompose();
         if (formalQuoteId) {
           showMailToast('Quotation sent to client.');
@@ -1682,6 +1686,18 @@
         } else {
           showMailToast('Email sent — check the Outbox tab to see it.');
           if (currentMailFolder === 'outbox') loadMail('outbox');
+        }
+        // Forwarding counts as handling the original message too.
+        if (fwd && !fwd.seen) {
+          fetch('/api/admin/mailbox/mark-read?' + authQS(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: 'INBOX', uid: fwd.uid }),
+          }).then(() => {
+            fwd.seen = true;
+            updateUnreadBadge();
+            renderMailList();
+          }).catch(() => {});
         }
       })
       .catch((err) => {
