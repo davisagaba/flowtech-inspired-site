@@ -958,9 +958,11 @@
           </select>
         </td>
         <td>
-          ${q.status === 'sent'
-            ? '<span class="muted">Sent</span>'
-            : `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendQuote('${q.quoteNumber}', this)">Send to Client</button>`}
+          ${q.formalQuoteId
+            ? `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="switchPanel('formalquotes'); loadFormalQuotes().then(() => openFormalQuoteForm(${q.formalQuoteId}))">Open Formal Quote</button>`
+            : (q.status === 'sent'
+                ? '<span class="muted">Sent</span>'
+                : `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendQuote('${q.quoteNumber}', this)">Send to Client</button>`)}
           <button class="btn-outline-sm" onclick="generateInvoice('${q.quoteNumber}', this)">Generate Invoice</button>
           ${q.phone ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;background:#25d366;color:#fff;border-color:#25d366;" href="${whatsappQuoteLink(q.phone, q.quoteNumber, q.name)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
         </td>
@@ -1654,7 +1656,7 @@
   let fqItemRowCount = 0;
 
   function loadFormalQuotes() {
-    fetch('/api/admin/formal-quotes?' + authQS(), { cache: 'no-store' })
+    return fetch('/api/admin/formal-quotes?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         currentFormalQuotes = data.quotes || [];

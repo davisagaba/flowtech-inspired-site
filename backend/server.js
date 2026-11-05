@@ -345,92 +345,61 @@ app.post('/quote', (req, res) => {
     const date = new Date();
     const grandTotal = items.reduce((sum, it) => sum + (Number(it.lineTotal) || 0), 0);
 
-    // --- Generate PDF ---
-    const filename = `quote-${quoteNumber}.pdf`;
-    const filePath = path.join(QUOTES_DIR, filename);
-    const doc = new PDFDocument({ margin: 50 });
-    const stream = fs.createWriteStream(filePath);
-    doc.pipe(stream);
+    // Auto-create a matching draft in the formal Quotation system (the
+    // LC-QT-numbered template), pre-filled from the website submission.
+    // Cart unitPrice is VAT-inclusive; the formal template adds its own 15%
+    // on top, so it's unwound here to avoid double-charging VAT.
+    const docs = loadFormalDocs();
+    const nextId = docs.reduce((max, d) => Math.max(max, d.id || 0), 0) + 1;
+    const formalItems = items.map((it) => ({
+      code: it.code || '',
+      description: it.name || '',
+      manufacturerCode: '',
+      qty: Number(it.qty) || 1,
+      unitPrice: Math.round(((Number(it.unitPrice) || 0) / 1.15) * 100) / 100,
+      weight: 0,
+    }));
+    const formalQuote = {
+      id: nextId,
+      type: 'QT',
+      status: 'draft',
+      docNumber: null,
+      revision: 0,
+      parentDocumentId: null,
+      date: date.toISOString().slice(0, 10),
+      customerName: name,
+      customerCompany: company || '',
+      customerPhone: phone || '',
+      customerEmail: email,
+      account: '',
+      customerVatNo: '',
+      refNo: '',
+      discountRate: 0,
+      vatRate: 0.15,
+      items: formalItems,
+      totalWeight: 0,
+      accountRep: '',
+      notes: [timeline, message].filter(Boolean).join(' — '),
+      createdBy: 'Website',
+      lastOperator: 'Website',
+      createdAt: new Date().toISOString(),
+      sourceQuoteNumber: quoteNumber,
+    };
+    docs.push(formalQuote);
+    saveFormalDocs(docs);
 
-    doc.fontSize(20).fillColor('#0d5559').text('Life Style Ceramics', { continued: false });
-    doc.fontSize(10).fillColor('#444').text('Quotation');
-    doc.moveDown(1.5);
+    // Log the lead for pipeline/client tracking, linked to the new draft —
+    // no PDF is generated or sent here; staff reviews and fills in the
+    // formal quote (account, VAT no, weights) before issuing it.
+    const logLine = JSON.stringify({
+      quoteNumber, name, email, phone, company, timeline, message, items, grandTotal, date,
+      status: 'pending_review',
+      stage: 'requested',
+      formalQuoteId: nextId,
+    }) + '\n';
+    fs.appendFile(LOG_PATH, logLine, () => {});
 
-    doc.fontSize(10).fillColor('#000');
-    doc.text(`Quote Number: ${quoteNumber}`);
-    doc.text(`Date: ${date.toLocaleDateString('en-ZA')}`);
-    doc.moveDown(1);
-
-    doc.fontSize(11).fillColor('#000').text('Prepared for:', { underline: true });
-    doc.fontSize(10).text(name);
-    if (company) doc.text(company);
-    doc.text(email);
-    if (phone) doc.text(phone);
-    doc.moveDown(1.5);
-
-    // Table header
-    const tableTop = doc.y;
-    doc.fontSize(10).fillColor('#444');
-    doc.text('Item', 50, tableTop, { width: 220 });
-    doc.text('Code', 270, tableTop, { width: 90 });
-    doc.text('Qty', 360, tableTop, { width: 40, align: 'right' });
-    doc.text('Unit Price', 400, tableTop, { width: 80, align: 'right' });
-    doc.text('Line Total', 480, tableTop, { width: 70, align: 'right' });
-    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).strokeColor('#ccc').stroke();
-
-    let y = tableTop + 22;
-    doc.fillColor('#000');
-    items.forEach((it) => {
-      doc.fontSize(9);
-      doc.text(String(it.name || ''), 50, y, { width: 220 });
-      doc.text(String(it.code || ''), 270, y, { width: 90 });
-      doc.text(String(it.qty || 1), 360, y, { width: 40, align: 'right' });
-      doc.text(formatZAR(Number(it.unitPrice) || 0), 400, y, { width: 80, align: 'right' });
-      doc.text(formatZAR(Number(it.lineTotal) || 0), 480, y, { width: 70, align: 'right' });
-      y += 20;
-    });
-
-    doc.moveTo(50, y + 5).lineTo(550, y + 5).strokeColor('#ccc').stroke();
-    doc.fontSize(11).fillColor('#0d5559').text(`Total (incl. 15% VAT): ${formatZAR(grandTotal)}`, 50, y + 15, { width: 500, align: 'right' });
-
-    if (timeline || message) {
-      doc.moveDown(3);
-      doc.fontSize(10).fillColor('#000');
-      if (timeline) doc.text(`Timeline: ${timeline}`);
-      if (message) doc.text(`Notes: ${message}`);
-    }
-
-    doc.moveDown(2);
-    doc.fontSize(8).fillColor('#888').text(
-      'This quotation is valid for 30 days from the date above. Prices include 15% VAT and are subject to confirmation of stock availability.',
-      { width: 500 }
-    );
-
-    doc.end();
-
-    stream.on('finish', () => {
-      // Log the request + where its PDF lives on disk, for staff to review and
-      // forward manually (stand-in for auto-emailing until SMTP is configured).
-      const logLine = JSON.stringify({
-        quoteNumber, name, email, phone, company, timeline, message, items, grandTotal, date,
-        status: 'pending_review',
-        stage: 'requested',
-        pdfPath: filePath,
-      }) + '\n';
-      fs.appendFile(LOG_PATH, logLine, () => {});
-
-      // Client only gets confirmation that the request was received — no PDF
-      // link. The quote is forwarded by a team member after review.
-      res.json({
-        ok: true,
-        quoteNumber,
-      });
-    });
-
-    stream.on('error', (err) => {
-      console.error('PDF write error:', err);
-      res.status(500).json({ ok: false, error: 'Could not generate PDF.' });
-    });
+    res.json({ ok: true, quoteNumber });
   } catch (err) {
     console.error('Quote endpoint error:', err);
     res.status(500).json({ ok: false, error: 'Server error.' });
@@ -479,7 +448,16 @@ app.post('/admin/send-quote', requireAdmin, async (req, res) => {
     if (!quote) {
       return res.status(404).json({ ok: false, error: 'Quote not found.' });
     }
-    if (!fs.existsSync(quote.pdfPath)) {
+    // Leads from before the formal-quotation system was wired in still carry
+    // the old ad-hoc PDF and send that way; newer leads have a linked
+    // formalQuoteId instead and are sent from the Formal Quotes tab.
+    if (quote.formalQuoteId && !quote.pdfPath) {
+      return res.status(400).json({
+        ok: false,
+        error: 'This lead uses the new Formal Quotation system — open it in the Formal Quotes tab to issue and send it.',
+      });
+    }
+    if (!quote.pdfPath || !fs.existsSync(quote.pdfPath)) {
       return res.status(404).json({ ok: false, error: 'Quote PDF not found on disk.' });
     }
 
@@ -1921,6 +1899,16 @@ app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
     quote.sentAt = new Date().toISOString();
     docs[idx] = quote;
     saveFormalDocs(docs);
+
+    // If this draft was auto-created from a website lead, advance that
+    // lead's pipeline stage too, so the Quotes tab stepper stays accurate.
+    const leadsByNumber = new Map();
+    readJsonLines(LOG_PATH).forEach((l) => leadsByNumber.set(l.quoteNumber, l));
+    const linkedLead = [...leadsByNumber.values()].find((l) => l.formalQuoteId === id);
+    if (linkedLead) {
+      appendQuoteUpdate(linkedLead.quoteNumber, { status: 'sent', stage: 'quote_sent', sentAt: new Date().toISOString() });
+    }
+
     logActivity(req.adminUser, 'sent_formal_quote', `${quote.docNumber} to ${quote.customerEmail}`);
     res.json({ ok: true });
   } catch (err) {
