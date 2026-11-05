@@ -492,13 +492,14 @@
     <input type="hidden" id="fq-id">
     <input type="hidden" id="fq-parentId">
     <p class="muted" id="fq-parent-note" style="display:none;"></p>
+    <p id="fq-duplicate-note" style="display:none;background:#fdf0d5;color:#8a5f00;padding:8px 12px;border-radius:8px;font-size:13px;"></p>
     <div class="form-grid-2">
       <div class="form-row"><label>Customer Name *</label><input type="text" id="fq-customerName"></div>
       <div class="form-row"><label>Company Name</label><input type="text" id="fq-customerCompany"></div>
     </div>
     <div class="form-grid-2">
       <div class="form-row"><label>Phone</label><input type="text" id="fq-customerPhone"></div>
-      <div class="form-row"><label>Email</label><input type="email" id="fq-customerEmail"></div>
+      <div class="form-row"><label>Email</label><input type="email" id="fq-customerEmail" oninput="checkFormalQuoteDuplicate()"></div>
     </div>
     <div class="form-grid-2">
       <div class="form-row"><label>Account <span class="muted" style="font-weight:400;">(defaults to CASR023 if left blank)</span></label><input type="text" id="fq-account" placeholder="CASR023"></div>
@@ -1855,9 +1856,10 @@
           const canSend = q.status === 'issued';
           const replacedBy = currentFormalQuotes.find((x) => x.parentDocumentId === q.id);
           const replaces = q.parentDocumentId ? currentFormalQuotes.find((x) => x.id === q.parentDocumentId) : null;
+          const duplicateOf = q.possibleDuplicateOf ? currentFormalQuotes.find((x) => x.id === q.possibleDuplicateOf) : null;
           return `<tr>
             <td>${q.docNumber || '(unissued draft)'}${replaces ? `<br><span class="muted" style="font-size:11px;">replaces ${replaces.docNumber || '#' + replaces.id}</span>` : ''}${replacedBy ? `<br><span class="muted" style="font-size:11px;">replaced by ${replacedBy.docNumber || '#' + replacedBy.id}</span>` : ''}</td>
-            <td>${q.customerName}${q.customerCompany ? '<br><span class="muted">' + q.customerCompany + '</span>' : ''}</td>
+            <td>${q.customerName}${q.customerCompany ? '<br><span class="muted">' + q.customerCompany + '</span>' : ''}${duplicateOf && duplicateOf.status !== 'void' ? `<br><span class="pill" style="background:#fdf0d5;color:#8a5f00;">⚠ possible duplicate of ${duplicateOf.docNumber || '#' + duplicateOf.id}</span>` : ''}</td>
             <td>${q.date}</td>
             <td>${total}</td>
             <td><span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status}</span>${q.emailOpenedAt ? `<br><span class="pill done" style="margin-top:4px;">✓ Read ${q.emailOpenCount > 1 ? '(' + q.emailOpenCount + 'x)' : ''}</span>` : ''}</td>
@@ -2008,6 +2010,25 @@
     }
     document.getElementById('formal-quote-status').textContent = '';
     document.getElementById('formal-quote-modal').classList.add('open');
+    checkFormalQuoteDuplicate();
+  }
+
+  // Warns (never blocks) when the entered email already has another
+  // active, non-void quote on file, so staff can catch accidental
+  // re-quoting of the same client before saving.
+  function checkFormalQuoteDuplicate() {
+    const email = document.getElementById('fq-customerEmail').value.trim().toLowerCase();
+    const editingId = Number(document.getElementById('fq-id').value) || null;
+    const note = document.getElementById('fq-duplicate-note');
+    if (!email) { note.style.display = 'none'; return; }
+    const existing = currentFormalQuotes.find((x) =>
+      x.id !== editingId && x.status !== 'void' && String(x.customerEmail || '').toLowerCase() === email);
+    if (existing) {
+      note.textContent = `⚠ ${existing.customerName} already has an active quote: ${existing.docNumber || '#' + existing.id} (${existing.status}). Check before creating another.`;
+      note.style.display = '';
+    } else {
+      note.style.display = 'none';
+    }
   }
 
   function reissueFormalQuote(voidId) {

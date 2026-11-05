@@ -396,6 +396,11 @@ app.post('/quote', (req, res) => {
         weight: Number(catalogProduct && catalogProduct.weight) || 0,
       };
     });
+    // Flag (never block) a client who already has an active, non-void
+    // quote on file, so staff can spot duplicate submissions and decide
+    // whether to work the existing one instead of creating a fresh draft.
+    const existingActiveQuote = docs.find((d) => d.status !== 'void' && String(d.customerEmail || '').toLowerCase() === String(email).toLowerCase());
+
     const formalQuote = {
       id: nextId,
       type: 'QT',
@@ -421,6 +426,7 @@ app.post('/quote', (req, res) => {
       lastOperator: 'Website',
       createdAt: new Date().toISOString(),
       sourceQuoteNumber: quoteNumber,
+      possibleDuplicateOf: existingActiveQuote ? existingActiveQuote.id : null,
     };
     docs.push(formalQuote);
     saveFormalDocs(docs);
@@ -442,9 +448,10 @@ app.post('/quote', (req, res) => {
     mailer.sendMail({
       from: `"${settings.legalName || settings.companyName} Website" <${process.env.LSC_SMTP_USER}>`,
       to: process.env.LSC_SMTP_USER,
-      subject: `New Quote Request from ${name} (${quoteNumber})`,
+      subject: `${existingActiveQuote ? '⚠ Possible duplicate — ' : ''}New Quote Request from ${name} (${quoteNumber})`,
       text: [
         `A new quote request just came in from the website.`,
+        existingActiveQuote ? `⚠ ${name} already has an active quote on file: ${existingActiveQuote.docNumber || '#' + existingActiveQuote.id} (${existingActiveQuote.status}). Check before creating a new one.` : null,
         '',
         `Name: ${name}`,
         `Email: ${email}`,
