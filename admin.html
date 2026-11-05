@@ -175,6 +175,11 @@
   .attach-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .attach-chip { display: inline-flex; align-items: center; gap: 6px; background: #eaf5f4; color: var(--teal); font-size: 12px; padding: 4px 10px; border-radius: 999px; }
   .attach-chip button { background: none; border: none; color: var(--teal); cursor: pointer; font-weight: 700; font-size: 13px; padding: 0; }
+  .qproduct-suggestions { position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; max-height: 220px; overflow-y: auto; z-index: 30; box-shadow: 0 8px 20px rgba(0,0,0,.1); }
+  .qproduct-suggestion { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f1f1ef; }
+  .qproduct-suggestion:last-child { border-bottom: none; }
+  .qproduct-suggestion:hover { background: #fafbfc; }
+  .qproduct-suggestion .qps-code { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
   .inline-reply-actions { display: flex; gap: 10px; margin-top: 10px; }
 
   .panel { display: none; animation: fadeIn .18s ease; }
@@ -1880,7 +1885,11 @@
     row.id = 'fq-item-row-' + i;
     row.innerHTML = `
       <td><input type="text" id="fq-item-code-${i}" value="${it.code || ''}" style="width:60px;" onchange="fillFormalQuoteItemFromCatalog(${i})"></td>
-      <td><input type="text" id="fq-item-desc-${i}" value="${it.description || ''}" style="width:160px;"></td>
+      <td style="position:relative;">
+        <input type="text" id="fq-item-desc-${i}" value="${it.description || ''}" style="width:160px;" autocomplete="off"
+          oninput="filterFormalQuoteItemSuggestions(${i})" onblur="setTimeout(() => hideFormalQuoteItemSuggestions(${i}), 150)">
+        <div id="fq-item-suggestions-${i}" class="qproduct-suggestions" style="width:260px;" hidden></div>
+      </td>
       <td><input type="text" id="fq-item-mfr-${i}" value="${it.manufacturerCode || ''}" style="width:90px;"></td>
       <td><input type="number" id="fq-item-qty-${i}" value="${it.qty || 1}" style="width:50px;"></td>
       <td><input type="number" step="0.01" id="fq-item-price-${i}" value="${it.unitPrice || ''}" style="width:90px;"></td>
@@ -1889,6 +1898,53 @@
     `;
     tbody.appendChild(row);
     if (it.code && !it.weight) fillFormalQuoteItemFromCatalog(i);
+  }
+
+  // Live product-name search against the catalog, scoped to one item row,
+  // so staff can pull in code/description/price/weight by typing a name
+  // instead of having to already know the product code.
+  function filterFormalQuoteItemSuggestions(i) {
+    const term = document.getElementById(`fq-item-desc-${i}`).value.trim().toLowerCase();
+    const box = document.getElementById(`fq-item-suggestions-${i}`);
+    if (term.length < 2) {
+      box.hidden = true;
+      box.innerHTML = '';
+      return;
+    }
+    const matches = currentProducts
+      .filter((p) => (p.name || '').toLowerCase().includes(term) || (p.code || '').toLowerCase().includes(term))
+      .slice(0, 8);
+    if (matches.length === 0) {
+      box.hidden = true;
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML = matches.map((p, mi) => `
+      <div class="qproduct-suggestion" data-mi="${mi}">${p.name}<span class="qps-code">${p.code || ''}</span></div>
+    `).join('');
+    box.hidden = false;
+    box.querySelectorAll('.qproduct-suggestion').forEach((el) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        selectFormalQuoteItemProduct(i, matches[Number(el.dataset.mi)]);
+      });
+    });
+  }
+
+  function hideFormalQuoteItemSuggestions(i) {
+    const box = document.getElementById(`fq-item-suggestions-${i}`);
+    if (box) box.hidden = true;
+  }
+
+  function selectFormalQuoteItemProduct(i, product) {
+    document.getElementById(`fq-item-code-${i}`).value = product.code || '';
+    document.getElementById(`fq-item-desc-${i}`).value = product.name || '';
+    // Formal-quote unitPrice is VAT-exclusive, unlike the storefront price
+    // (which includes VAT) — so VAT is unwound here, same conversion used
+    // when the website auto-creates a draft from a cart checkout.
+    document.getElementById(`fq-item-price-${i}`).value = (Number(product.price) * GBP_TO_ZAR_RATE).toFixed(2);
+    if (product.weight) document.getElementById(`fq-item-weight-${i}`).value = product.weight;
+    hideFormalQuoteItemSuggestions(i);
   }
 
   // Pulls weight (and description, if still blank) from the matching
