@@ -119,7 +119,9 @@ h1, h2, h3, h4, .logo, .btn-cta, .btn-outline, .category-tab, .nav-enquire {
   display: block;
   padding: 6px 0;
   font-size: 14px;
+  color: var(--dark);
 }
+.megamenu-col a:hover { color: var(--red); opacity: 1; }
 .megamenu-feature {
   display: flex;
   flex-direction: column;
