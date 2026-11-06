@@ -645,6 +645,18 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="client-email-modal">
+  <div class="modal">
+    <h3 id="cem-subject" style="margin-bottom:4px;"></h3>
+    <div class="mail-meta" id="cem-meta" style="margin-bottom:14px;"></div>
+    <div class="mail-body" id="cem-body" style="max-height:50vh;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeClientEmailModal()">Close</button>
+      <button class="btn" id="cem-open-btn">Open in Email tab</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="receipt-modal">
   <div class="modal">
     <h3>Record Payment / Generate Receipt</h3>
@@ -2164,19 +2176,20 @@
     loadClientEmailThread(c.email);
   }
 
+  let currentClientEmailThread = [];
   function loadClientEmailThread(email) {
     const container = document.getElementById('client-email-thread');
     fetch('/api/admin/clients/' + encodeURIComponent(email) + '/emails?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || 'Failed to load');
-        const thread = data.thread || [];
-        if (thread.length === 0) {
+        currentClientEmailThread = data.thread || [];
+        if (currentClientEmailThread.length === 0) {
           container.innerHTML = '<p class="muted">No matching emails found in Inbox or Outbox.</p>';
           return;
         }
-        container.innerHTML = thread.map((m) => `
-          <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f1f1ef;">
+        container.innerHTML = currentClientEmailThread.map((m, i) => `
+          <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f1f1ef;cursor:pointer;" onclick="openClientEmailPreview(${i})">
             <span class="pill ${m.direction === 'sent' ? 'done' : ''}" style="flex-shrink:0;">${m.direction === 'sent' ? 'Sent' : 'Received'}</span>
             <div style="min-width:0;flex:1;">
               <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.subject}</div>
@@ -2189,6 +2202,52 @@
       .catch((err) => {
         container.innerHTML = '<p class="muted">Could not load email history: ' + err.message + '</p>';
       });
+  }
+
+  function openClientEmailPreview(i) {
+    const m = currentClientEmailThread[i];
+    if (!m) return;
+    document.getElementById('cem-subject').textContent = m.subject || '(no subject)';
+    document.getElementById('cem-meta').innerHTML = `
+      <strong>${m.direction === 'sent' ? 'To' : 'From'}</strong> ${m.direction === 'sent' ? (m.to || '') : (m.from || '')}<br>
+      ${fmtMailDate(m.date)}
+    `;
+    document.getElementById('cem-body').textContent = m.body || m.snippet || '(no content)';
+    const openBtn = document.getElementById('cem-open-btn');
+    if (m.uid && m.folder) {
+      openBtn.style.display = '';
+      openBtn.onclick = () => jumpToEmailInMailbox(m.folder, m.uid);
+    } else {
+      openBtn.style.display = 'none';
+    }
+    document.getElementById('client-email-modal').classList.add('open');
+  }
+
+  function closeClientEmailModal() {
+    document.getElementById('client-email-modal').classList.remove('open');
+  }
+
+  // Switches to the Email tab, loads the right folder, and opens the exact
+  // message — used by the client-detail email preview's "Open in Email tab".
+  function jumpToEmailInMailbox(folder, uid) {
+    closeClientEmailModal();
+    switchPanel('email');
+    const goToFolder = () => {
+      const def = mailFolders.find((f) => f.path === folder || (folder === 'INBOX' && f.key === 'inbox'));
+      const key = def ? def.key : 'inbox';
+      currentMailFolder = key;
+      document.querySelectorAll('.mail-tab').forEach((t) => t.classList.toggle('active', t.id === 'tab-' + key));
+      fetchMailPage(key, 0, true).then(() => {
+        const idx = currentMailMessages.findIndex((m) => m.uid === uid);
+        if (idx !== -1) openMailMessage(idx);
+      });
+    };
+    if (mailFolders.length <= 2) {
+      loadMailFolders();
+      setTimeout(goToFolder, 400);
+    } else {
+      goToFolder();
+    }
   }
 
   function saveClientNotes(email) {

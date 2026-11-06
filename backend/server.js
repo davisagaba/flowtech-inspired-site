@@ -249,6 +249,61 @@ async function fetchMailbox(folder, limit, offset = 0) {
   return messages.reverse();
 }
 
+// --- Discord new-mail alerts ---
+// Webhook URL lives only in the systemd unit's Environment= (never in this
+// source file or git — it's a bearer secret, anyone with it can post into
+// the channel). Polls the Inbox periodically; a message is alerted exactly
+// once, tracked by uid in a small local file so restarts don't re-alert.
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
+const DISCORD_ALERTED_UIDS_FILE = '/opt/lifestyle-ceramics/backend/discord-alerted-uids.json';
+function loadAlertedMailUids() {
+  if (!fs.existsSync(DISCORD_ALERTED_UIDS_FILE)) return null; // null = never run before
+  try { return JSON.parse(fs.readFileSync(DISCORD_ALERTED_UIDS_FILE, 'utf8')); } catch { return []; }
+}
+function saveAlertedMailUids(uids) {
+  fs.writeFileSync(DISCORD_ALERTED_UIDS_FILE, JSON.stringify(uids.slice(-500)));
+}
+
+async function checkNewMailAndAlertDiscord() {
+  if (!DISCORD_WEBHOOK_URL) return;
+  try {
+    const messages = await fetchMailbox('INBOX', 25);
+    const previouslyAlerted = loadAlertedMailUids();
+
+    // First run ever: seed the "already seen" set silently so we don't
+    // blast the whole existing inbox as "new" the moment this ships.
+    if (previouslyAlerted === null) {
+      saveAlertedMailUids(messages.map((m) => m.uid));
+      return;
+    }
+
+    const alertedSet = new Set(previouslyAlerted);
+    const newOnes = messages.filter((m) => !alertedSet.has(m.uid));
+    if (newOnes.length === 0) return;
+
+    for (const m of newOnes) {
+      const content = [
+        '📧 **New email received**',
+        `**From:** ${m.from || 'Unknown'}`,
+        `**Subject:** ${m.subject || '(no subject)'}`,
+        m.snippet ? m.snippet.slice(0, 300) : '',
+      ].filter(Boolean).join('\n');
+      await fetch(DISCORD_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      }).catch((err) => console.warn('Discord webhook post failed:', err.message));
+      alertedSet.add(m.uid);
+    }
+    saveAlertedMailUids([...alertedSet]);
+  } catch (err) {
+    console.warn('Discord mail-alert check failed:', err.message);
+  }
+}
+
+setInterval(checkNewMailAndAlertDiscord, 2 * 60 * 1000);
+checkNewMailAndAlertDiscord().catch(() => {});
+
 // --- Admin users (named logins) ---
 const USERS_JSON = '/opt/lifestyle-ceramics/backend/users.json';
 function loadUsers() {
@@ -1023,10 +1078,10 @@ app.get('/admin/clients/:email/emails', requireAdmin, async (req, res) => {
 
     const received = inbox
       .filter((m) => matches(m.fromAddress) || matches(m.from))
-      .map((m) => ({ direction: 'received', subject: m.subject, date: m.date, snippet: m.snippet, seen: m.seen }));
+      .map((m) => ({ direction: 'received', subject: m.subject, date: m.date, snippet: m.snippet, seen: m.seen, uid: m.uid, folder: 'INBOX', from: m.from, to: m.to, body: m.body }));
     const sent = outbox
       .filter((m) => matches(m.to))
-      .map((m) => ({ direction: 'sent', subject: m.subject, date: m.date, snippet: m.snippet, seen: true }));
+      .map((m) => ({ direction: 'sent', subject: m.subject, date: m.date, snippet: m.snippet, seen: true, uid: m.uid, folder: sentFolder, from: m.from, to: m.to, body: m.body }));
 
     const thread = [...received, ...sent].sort((a, b) => new Date(b.date) - new Date(a.date));
     res.json({ ok: true, thread });
