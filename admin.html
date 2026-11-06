@@ -391,6 +391,14 @@
         <h2 style="font-size:16px;">Quick Quote Link</h2>
         <p class="muted">Build a pre-filled quote link to send over WhatsApp — the client lands on the form with their details and items already loaded, they just review and submit.</p>
 
+        <div class="form-row" style="background:#f5f7f6;border-radius:12px;padding:14px 16px;">
+          <label style="margin-bottom:6px;">Add from WhatsApp Web</label>
+          <p class="muted" style="margin:0 0 10px;">Drag this button to your bookmarks bar. While you're chatting with a client on <strong>web.whatsapp.com</strong>, click it — it opens this tool in a new tab with their name (and phone, if they're not already saved as a contact) filled in.</p>
+          <a id="ql-bookmarklet" href="#" class="btn-outline-sm" style="text-decoration:none;display:inline-block;" onclick="return false;" title="Drag me to your bookmarks bar">📲 Add from WhatsApp</a>
+          <p class="muted" style="margin:10px 0 0;font-size:12px;">Can't drag it? Click here to <a href="#" onclick="document.getElementById('ql-bookmarklet-code').hidden = !document.getElementById('ql-bookmarklet-code').hidden; return false;">show the code to paste in manually</a>.</p>
+          <textarea id="ql-bookmarklet-code" readonly hidden style="width:100%;margin-top:8px;font-family:monospace;font-size:11px;height:70px;" onclick="this.select()"></textarea>
+        </div>
+
         <div class="form-row" style="position:relative;">
           <label>Client</label>
           <input type="text" id="ql-client-search" placeholder="Search existing client by name/phone, or type a new one…" autocomplete="off" oninput="filterQuickLinkClients()">
@@ -836,10 +844,29 @@
         loadOverviewExtras();
         loadWhoami();
         startAutoRefresh();
+        applyWhatsAppQuickLinkPrefill();
       })
       .catch(() => {
         document.getElementById('login-error').textContent = 'Incorrect username or password.';
       });
+  }
+
+  // Lands here from the "Add from WhatsApp" bookmarklet (see Quick Quote
+  // Link panel) carrying ?ql_name=&ql_phone= — jumps straight into the
+  // Quick Quote Link tool pre-filled, then scrubs the URL so a page
+  // refresh doesn't re-trigger it.
+  function applyWhatsAppQuickLinkPrefill() {
+    const params = new URLSearchParams(window.location.search);
+    const qlName = params.get('ql_name');
+    const qlPhone = params.get('ql_phone');
+    if (!qlName && !qlPhone) return;
+    switchPanel('quicklink');
+    if (qlName) {
+      document.getElementById('ql-client-search').value = qlName;
+      document.getElementById('ql-name').value = qlName;
+    }
+    if (qlPhone) document.getElementById('ql-phone').value = qlPhone;
+    history.replaceState(null, '', window.location.pathname);
   }
 
   // ---------- Auto-refresh ----------
@@ -1173,7 +1200,10 @@
     if (name === 'stock') loadStock();
     if (name === 'formalquotes') loadFormalQuotes();
     if (name === 'clients') loadClients();
-    if (name === 'quicklink' && currentClients.length === 0) loadClients();
+    if (name === 'quicklink') {
+      if (currentClients.length === 0) loadClients();
+      setupWhatsAppBookmarklet();
+    }
     if (name === 'documents') loadDocuments();
     if (name === 'settings') loadSettingsForm();
     if (name === 'overview') loadOverviewExtras();
@@ -2129,6 +2159,30 @@
 
   // ---------- Quick Quote Link (WhatsApp) ----------
   let quickLinkItems = [];
+
+  // Builds the bookmarklet that reads the currently open WhatsApp Web
+  // chat's header (the contact's saved name, or their raw number if not
+  // yet saved as a contact) and opens this admin panel pre-filled via
+  // ?ql_name=&ql_phone= (handled by applyWhatsAppQuickLinkPrefill).
+  function setupWhatsAppBookmarklet() {
+    const adminUrl = window.location.origin + window.location.pathname;
+    const src = `(function(){
+      var h = document.querySelector('header span[title]') || document.querySelector('header span[dir="auto"]');
+      var t = h ? (h.getAttribute('title') || h.textContent || '').trim() : '';
+      if (!t) { alert('Open a WhatsApp chat first, then click this again.'); return; }
+      var digits = t.replace(/[^0-9+]/g, '');
+      var looksLikePhone = digits.replace(/[^0-9]/g, '').length >= 9 && digits.length >= (t.length - 3);
+      var name = looksLikePhone ? '' : t;
+      var phone = looksLikePhone ? digits : '';
+      var url = ${JSON.stringify(adminUrl)} + '?ql_name=' + encodeURIComponent(name) + '&ql_phone=' + encodeURIComponent(phone);
+      window.open(url, '_blank');
+    })();`;
+    const bookmarklet = 'javascript:' + encodeURIComponent(src.replace(/\s+/g, ' '));
+    const link = document.getElementById('ql-bookmarklet');
+    if (link) link.href = bookmarklet;
+    const codeBox = document.getElementById('ql-bookmarklet-code');
+    if (codeBox) codeBox.value = bookmarklet;
+  }
 
   function filterQuickLinkClients() {
     const term = document.getElementById('ql-client-search').value.trim().toLowerCase();
