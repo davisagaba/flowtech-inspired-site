@@ -185,6 +185,21 @@
   .row-actions-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 20px rgba(0,0,0,.12); z-index: 30; min-width: 170px; overflow: hidden; }
   .row-actions-menu a { display: block; padding: 9px 14px; font-size: 13px; color: var(--text); text-decoration: none; white-space: nowrap; }
   .row-actions-menu a:hover { background: #fafbfc; }
+  .client-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .client-stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-sm); }
+  .client-stat-card .num { font-size: 22px; font-weight: 800; color: var(--teal); letter-spacing: -0.02em; }
+  .client-stat-card .label { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
+  .client-vip-badge { display: inline-block; background: linear-gradient(135deg, #f6d675, #d4a93a); color: #4a3700; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 999px; letter-spacing: .03em; margin-left: 6px; vertical-align: middle; }
+  .client-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; flex-shrink: 0; }
+  .client-avatar-lg { width: 56px; height: 56px; font-size: 20px; }
+  .client-detail-header { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+  .client-quick-actions { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+  .client-quick-actions a, .client-quick-actions button { text-decoration: none; }
+  .client-history-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f1ef; gap: 10px; }
+  .client-history-row:last-child { border-bottom: none; }
+  @media (max-width: 880px) {
+    .client-stats { grid-template-columns: repeat(2, 1fr); }
+  }
   .inline-reply-actions { display: flex; gap: 10px; margin-top: 10px; }
 
   .panel { display: none; animation: fadeIn .18s ease; }
@@ -390,6 +405,8 @@
     <div class="panel" id="panel-clients">
       <section>
         <h2 style="font-size:16px;">Clients</h2>
+        <div class="client-stats" id="client-stats"></div>
+        <input type="text" id="client-search" class="form-row" style="width:100%;padding:9px 11px;border:1px solid #e2e4e1;border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:10px;" placeholder="Search clients by name, email or company…" oninput="renderClientsList()">
         <div class="unibox" style="min-height:420px;">
           <div class="mail-list" id="clients-list"><div class="mail-empty">Loading…</div></div>
           <div class="mail-reading-pane" id="client-detail-pane"><div class="mail-empty">Select a client to view their history</div></div>
@@ -1972,46 +1989,106 @@
 
   // ---------- Clients (CRM) ----------
   let currentClients = [];
+  const CLIENT_VIP_THRESHOLD = 50000;
+  const AVATAR_PALETTE = ['#0d5559', '#b8860b', '#6b21a8', '#1d4ed8', '#a31515', '#166534', '#9a3412'];
+  function avatarColorFor(name) {
+    const sum = [...(name || '?')].reduce((s, ch) => s + ch.charCodeAt(0), 0);
+    return AVATAR_PALETTE[sum % AVATAR_PALETTE.length];
+  }
+
   function loadClients() {
     const list = document.getElementById('clients-list');
     list.innerHTML = '<div class="mail-empty">Loading…</div>';
     fetch('/api/admin/clients?' + authQS(), { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
-        currentClients = data.clients || [];
-        if (currentClients.length === 0) {
-          list.innerHTML = '<div class="mail-empty">No clients yet</div>';
-          return;
-        }
-        list.innerHTML = currentClients.map((c, i) => `
-          <div class="mail-row" data-i="${i}" onclick="openClient(${i})">
-            <div class="mail-from">${c.name || '(no name)'}</div>
-            <div class="mail-subject">${c.email}</div>
-            <div class="mail-snippet">${c.quotes.length} quote${c.quotes.length === 1 ? '' : 's'} · ${fmtZAR(c.totalValue)}</div>
-            <div class="mail-date">${new Date(c.lastActivity).toLocaleDateString('en-ZA')}</div>
-          </div>
-        `).join('');
+        currentClients = (data.clients || []).sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+        renderClientStats();
+        renderClientsList();
       });
+  }
+
+  function renderClientStats() {
+    const totalValue = currentClients.reduce((sum, c) => sum + (c.totalValue || 0), 0);
+    const vipCount = currentClients.filter((c) => c.totalValue >= CLIENT_VIP_THRESHOLD).length;
+    const avgValue = currentClients.length ? totalValue / currentClients.length : 0;
+    document.getElementById('client-stats').innerHTML = `
+      <div class="client-stat-card"><div class="num">${currentClients.length}</div><div class="label">Total Clients</div></div>
+      <div class="client-stat-card"><div class="num">${fmtZAR(totalValue)}</div><div class="label">Total Quoted Value</div></div>
+      <div class="client-stat-card"><div class="num">${fmtZAR(avgValue)}</div><div class="label">Average per Client</div></div>
+      <div class="client-stat-card"><div class="num">${vipCount}</div><div class="label">VIP Clients (${fmtZAR(CLIENT_VIP_THRESHOLD)}+)</div></div>
+    `;
+  }
+
+  function renderClientsList() {
+    const term = document.getElementById('client-search').value.trim().toLowerCase();
+    const list = document.getElementById('clients-list');
+    const filtered = currentClients
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => !term || (c.name || '').toLowerCase().includes(term) || (c.email || '').toLowerCase().includes(term) || (c.company || '').toLowerCase().includes(term));
+
+    if (filtered.length === 0) {
+      list.innerHTML = `<div class="mail-empty">${currentClients.length ? 'No matching clients' : 'No clients yet'}</div>`;
+      return;
+    }
+    list.innerHTML = filtered.map(({ c, i }) => {
+      const initial = (c.name || '?').trim().charAt(0).toUpperCase() || '?';
+      const isVip = c.totalValue >= CLIENT_VIP_THRESHOLD;
+      return `
+      <div class="mail-row" data-i="${i}" onclick="openClient(${i})">
+        <div class="client-avatar" style="background:${avatarColorFor(c.name)};">${initial}</div>
+        <div class="mail-row-body">
+          <div class="mail-row-top">
+            <span class="mail-from">${c.name || '(no name)'}${isVip ? '<span class="client-vip-badge">VIP</span>' : ''}</span>
+            <span class="mail-date">${new Date(c.lastActivity).toLocaleDateString('en-ZA')}</span>
+          </div>
+          <div class="mail-subject">${c.company || c.email}</div>
+          <div class="mail-snippet">${c.quotes.length} quote${c.quotes.length === 1 ? '' : 's'} · ${fmtZAR(c.totalValue)}</div>
+        </div>
+      </div>`;
+    }).join('');
   }
 
   function openClient(i) {
     document.querySelectorAll('#clients-list .mail-row').forEach((row) => row.classList.remove('active'));
     document.querySelector(`#clients-list .mail-row[data-i="${i}"]`)?.classList.add('active');
     const c = currentClients[i];
+    const initial = (c.name || '?').trim().charAt(0).toUpperCase() || '?';
+    const isVip = c.totalValue >= CLIENT_VIP_THRESHOLD;
+    const waLink = c.phone ? `https://wa.me/${String(c.phone).replace(/[^0-9]/g, '')}` : '';
+
     document.getElementById('client-detail-pane').innerHTML = `
-      <h3>${c.name || '(no name)'}</h3>
-      <div class="mail-meta">
-        ${c.email}<br>
-        ${c.phone || ''}${c.company ? ' · ' + c.company : ''}<br>
-        Total value: ${fmtZAR(c.totalValue)} across ${c.quotes.length} quote(s)
+      <div class="client-detail-header">
+        <div class="client-avatar client-avatar-lg" style="background:${avatarColorFor(c.name)};">${initial}</div>
+        <div>
+          <h3 style="margin:0;">${c.name || '(no name)'}${isVip ? '<span class="client-vip-badge">VIP CLIENT</span>' : ''}</h3>
+          <div class="mail-meta" style="margin-top:4px;">${c.company ? c.company + ' · ' : ''}${c.email}${c.phone ? ' · ' + c.phone : ''}</div>
+        </div>
       </div>
+
+      <div class="client-stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">
+        <div class="client-stat-card"><div class="num">${fmtZAR(c.totalValue)}</div><div class="label">Total Value</div></div>
+        <div class="client-stat-card"><div class="num">${c.quotes.length}</div><div class="label">Quotes</div></div>
+        <div class="client-stat-card"><div class="num">${new Date(c.lastActivity).toLocaleDateString('en-ZA')}</div><div class="label">Last Activity</div></div>
+      </div>
+
+      <div class="client-quick-actions">
+        ${waLink ? `<a class="btn-outline-sm" style="background:#25d366;color:#fff;border-color:#25d366;" href="${waLink}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
+        ${c.phone ? `<a class="btn-outline-sm" href="tel:${c.phone}">📞 Call</a>` : ''}
+        <a class="btn-outline-sm" href="mailto:${c.email}">✉️ Email</a>
+        <button class="btn-outline-sm" onclick="switchPanel('quicklink'); document.getElementById('ql-client-search').value = ${JSON.stringify(c.name || '')}; document.getElementById('ql-name').value = ${JSON.stringify(c.name || '')}; document.getElementById('ql-phone').value = ${JSON.stringify(c.phone || '')}; document.getElementById('ql-company').value = ${JSON.stringify(c.company || '')};">+ New Quick Quote</button>
+      </div>
+
       <h4 style="margin-bottom:6px;">Quote History</h4>
       ${c.quotes.map((q) => `
-        <div style="margin-bottom:12px;">
-          <div style="font-size:13px;margin-bottom:4px;">${q.quoteNumber} — ${fmtZAR(q.grandTotal)}</div>
-          <div class="stage-stepper">${stageStepperHtml(q.stage)}</div>
+        <div class="client-history-row">
+          <div>
+            <div style="font-size:13px;font-weight:600;">${q.quoteNumber}</div>
+            <div class="stage-stepper" style="margin-top:4px;">${stageStepperHtml(q.stage)}</div>
+          </div>
+          <div style="font-weight:700;color:var(--teal);white-space:nowrap;">${fmtZAR(q.grandTotal)}</div>
         </div>`).join('') || '<p class="muted">None</p>'}
-      ${c.documents.length ? `<h4 style="margin:14px 0 6px;">Documents</h4>${c.documents.map((d) => `<div style="font-size:13px;margin-bottom:4px;">${d.docNumber} (${d.type}) — ${fmtZAR(d.total)}</div>`).join('')}` : ''}
+      ${c.documents.length ? `<h4 style="margin:14px 0 6px;">Documents</h4>${c.documents.map((d) => `<div class="client-history-row"><div style="font-size:13px;">${d.docNumber} (${d.type})</div><div style="font-weight:700;color:var(--teal);">${fmtZAR(d.total)}</div></div>`).join('')}` : ''}
       <h4 style="margin:14px 0 6px;">Email Correspondence</h4>
       <p class="muted" style="margin:0 0 6px;">Auto-detected from the live mailbox by matching this client's email address.</p>
       <div id="client-email-thread"><p class="muted">Loading…</p></div>
