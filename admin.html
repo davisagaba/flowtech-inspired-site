@@ -1474,7 +1474,11 @@
       <div class="reading-actions">
         ${currentMailFolder === 'inbox' ? `<button class="btn reply-btn" id="reply-toggle-btn" onclick="showInlineReply(${i})">Reply</button>` : ''}
         <button class="btn-outline-sm reply-btn" onclick="openCompose(${i})">Forward</button>
-        ${currentMailFolder === 'inbox' ? `<button class="btn-outline-sm reply-btn" onclick="showLinkToQuotePicker(${i})">🔗 Link to Quote</button>` : ''}
+        ${currentMailFolder === 'inbox' ? (
+          extractQuoteNumberFromSubject(m.subject)
+            ? `<button class="btn-outline-sm reply-btn" style="background:#eaf5f4;border-color:var(--teal);" onclick="openFormalQuoteByNumber(${JSON.stringify(extractQuoteNumberFromSubject(m.subject))}, this)">📄 Open Formal Quote</button>`
+            : `<button class="btn-outline-sm reply-btn" onclick="showLinkToQuotePicker(${i})">🔗 Link to Quote</button>`
+        ) : ''}
         ${currentMailFolder !== 'trash' ? `<button class="btn-danger-sm reply-btn" onclick="deleteMailMessage(${i})">Delete</button>` : ''}
       </div>
       <div id="link-to-quote-box" style="position:relative;"></div>
@@ -1743,6 +1747,43 @@
         status.textContent = 'Error: ' + err.message;
         if (btn) { btn.disabled = false; btn.textContent = 'Send Reply'; }
       });
+  }
+
+  // Recognizes a quote number embedded in a subject line — either an
+  // issued formal document (LC-QT-YYYY-MM-NNNN, present in "Re: Your
+  // Quotation ..." client replies) or a website lead number
+  // (LSC-YYYYMMDD-XXXX, present in "New Quote Request from ..." staff
+  // alerts) — so the right quote can be resolved and opened in one click
+  // instead of requiring the manual Link to Quote picker.
+  function extractQuoteNumberFromSubject(subject) {
+    const m = String(subject || '').match(/LC-QT-\d{4}-\d{2}-\d{4}|LSC-\d{8}-[0-9A-Fa-f]{4}/);
+    return m ? m[0] : null;
+  }
+
+  function openFormalQuoteByNumber(quoteNumber, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Opening…'; }
+    const findMatch = () => currentFormalQuotes.find((q) => q.docNumber === quoteNumber || q.sourceQuoteNumber === quoteNumber);
+    const go = () => {
+      const match = findMatch();
+      if (!match) {
+        if (btn) { btn.disabled = false; btn.textContent = '📄 Open Formal Quote'; }
+        alert('No matching formal quote found for ' + quoteNumber + ' — it may have been voided or deleted.');
+        return;
+      }
+      switchPanel('formalquotes');
+      if (match.status === 'draft') {
+        openFormalQuoteForm(match.id);
+      } else if (match.status === 'void') {
+        showMailToast('That quote (' + (match.docNumber || '#' + match.id) + ') is void — showing it in the list below.');
+      } else {
+        openQuoteRefModal(match.id);
+      }
+    };
+    if (currentFormalQuotes.length === 0) {
+      loadFormalQuotes().then(go);
+    } else {
+      go();
+    }
   }
 
   // Manual fallback for linking an email to a formal quote — used when a
