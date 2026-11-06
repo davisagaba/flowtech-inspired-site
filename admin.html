@@ -180,6 +180,9 @@
   .qproduct-suggestion:last-child { border-bottom: none; }
   .qproduct-suggestion:hover { background: #fafbfc; }
   .qproduct-suggestion .qps-code { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
+  .row-actions-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 20px rgba(0,0,0,.12); z-index: 30; min-width: 170px; overflow: hidden; }
+  .row-actions-menu a { display: block; padding: 9px 14px; font-size: 13px; color: var(--text); text-decoration: none; white-space: nowrap; }
+  .row-actions-menu a:hover { background: #fafbfc; }
   .inline-reply-actions { display: flex; gap: 10px; margin-top: 10px; }
 
   .panel { display: none; animation: fadeIn .18s ease; }
@@ -354,9 +357,15 @@
 
     <div class="panel" id="panel-quotes">
       <section>
-        <h2 style="font-size:16px;">Quote Requests</h2>
+        <div class="section-head">
+          <h2 style="font-size:16px;margin:0;">Quote Requests</h2>
+          <label class="muted" style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="qr-show-all" onchange="renderQuotesTable()"> Show sent/completed too
+          </label>
+        </div>
+        <p class="muted" id="qr-hidden-note" style="margin-top:0;"></p>
         <table id="quotes-table">
-          <thead><tr><th>Quote #</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Items</th><th>Total</th><th>Pipeline Stage</th><th>Action</th></tr></thead>
+          <thead><tr><th>Quote #</th><th>Date</th><th>Client</th><th>Items</th><th>Total</th><th>Stage</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </section>
@@ -1109,6 +1118,74 @@
       .catch((err) => alert('Could not delete: ' + err.message));
   }
 
+  let lastQuoteRequests = [];
+  const STAGE_COLORS = {
+    requested: '#fdf0d5;color:#8a5f00',
+    stock_confirmed: '#e3edfb;color:#1d4ed8',
+    quote_sent: '#eaf5f4;color:#0d5559',
+    invoice_sent: '#f3e8fd;color:#6b21a8',
+    paid: '#e6f6ea;color:#166534',
+  };
+
+  function renderQuotesTable() {
+    const showAll = document.getElementById('qr-show-all').checked;
+    const HANDLED_STAGES = ['quote_sent', 'invoice_sent', 'paid'];
+    const rows = showAll ? lastQuoteRequests : lastQuoteRequests.filter((q) => !HANDLED_STAGES.includes(q.stage));
+    const hiddenCount = lastQuoteRequests.length - rows.length;
+
+    document.querySelector('#quotes-table tbody').innerHTML = rows.map((q) => {
+      const stage = QUOTE_STAGES.find((s) => s.key === (q.stage || 'requested')) || QUOTE_STAGES[0];
+      const items = (q.items || []).map((it) => it.name + ' x' + it.qty);
+      const itemsDisplay = items.length > 1
+        ? `${items[0]} <span class="muted" title="${items.join(', ').replace(/"/g, '&quot;')}">+${items.length - 1} more</span>`
+        : (items[0] || '');
+      const badges = [
+        q.emailOpenedAt ? `<span title="Client opened the quotation email on ${new Date(q.emailOpenedAt).toLocaleString('en-ZA')}">✓</span>` : '',
+        q.rapidDuplicate ? `<span title="Likely accidental duplicate submission">🔴</span>` : (q.possibleDuplicateOf ? `<span title="Possible duplicate of an existing quote">⚠️</span>` : ''),
+      ].filter(Boolean).join(' ');
+      const rowId = 'qr-row-' + q.quoteNumber.replace(/[^a-zA-Z0-9]/g, '');
+      return `<tr class="${q.emailOpenedAt ? 'quote-row-read' : ''}">
+        <td>${q.quoteNumber}${badges ? ' ' + badges : ''}</td>
+        <td>${new Date(q.date).toLocaleDateString('en-ZA')}</td>
+        <td>${q.name || ''}<br><span class="muted" style="font-size:11px;">${q.email || ''}${q.phone ? ' · ' + q.phone : ''}</span></td>
+        <td>${itemsDisplay}</td>
+        <td>${fmtZAR(q.grandTotal)}</td>
+        <td>
+          <span class="pill" style="background:${STAGE_COLORS[stage.key] || '#f0f1f3;color:#444'};">${stage.label}</span>
+          <select class="stage-select" style="margin-top:4px;" onchange="setQuoteStage('${q.quoteNumber}', this.value)">
+            <option value="">Move to…</option>
+            ${QUOTE_STAGES.map((s) => `<option value="${s.key}">${s.label}</option>`).join('')}
+          </select>
+        </td>
+        <td style="position:relative;">
+          <button class="btn-outline-sm" onclick="toggleRowActions('${rowId}')">Actions ▾</button>
+          <div class="row-actions-menu" id="${rowId}" hidden>
+            ${q.formalQuoteId
+              ? `<a href="#" onclick="switchPanel('formalquotes'); loadFormalQuotes().then(() => openFormalQuoteForm(${q.formalQuoteId})); return false;">Open Formal Quote</a>`
+              : (q.status === 'sent' ? '<span class="muted" style="padding:8px 12px;display:block;">Already sent</span>' : `<a href="#" onclick="sendQuote('${q.quoteNumber}', this); return false;">Send to Client</a>`)}
+            <a href="#" onclick="generateInvoice('${q.quoteNumber}', this); return false;">Generate Invoice</a>
+            ${q.phone ? `<a href="${whatsappQuoteLink(q.phone, q.quoteNumber, q.name)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="7" class="muted">${lastQuoteRequests.length ? 'All caught up — nothing needs attention.' : 'No quote requests yet'}</td></tr>`;
+
+    document.getElementById('qr-hidden-note').textContent = (!showAll && hiddenCount > 0) ? `${hiddenCount} sent/completed quote${hiddenCount === 1 ? '' : 's'} hidden.` : '';
+  }
+
+  function toggleRowActions(rowId) {
+    document.querySelectorAll('.row-actions-menu').forEach((el) => {
+      if (el.id !== rowId) el.hidden = true;
+    });
+    const menu = document.getElementById(rowId);
+    menu.hidden = !menu.hidden;
+  }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.row-actions-menu') && !e.target.closest('[onclick^="toggleRowActions"]')) {
+      document.querySelectorAll('.row-actions-menu').forEach((el) => { el.hidden = true; });
+    }
+  });
+
   function render(data) {
     document.getElementById('refreshed').textContent = 'Updated ' + new Date().toLocaleString('en-ZA');
 
@@ -1122,32 +1199,8 @@
     document.querySelector('#top-pages-table tbody').innerHTML = data.allTime.topPages
       .map((p) => `<tr><td>${p.path}</td><td>${p.count}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">No data yet</td></tr>';
 
-    document.querySelector('#quotes-table tbody').innerHTML = data.quoteRequests
-      .map((q) => `<tr class="${q.emailOpenedAt ? 'quote-row-read' : ''}" ${q.emailOpenedAt ? `title="Client opened the quotation email on ${new Date(q.emailOpenedAt).toLocaleString('en-ZA')}"` : ''}>
-        <td>${q.quoteNumber}${q.emailOpenedAt ? ' <span class="pill done">✓ Read</span>' : ''}${q.rapidDuplicate ? ' <span class="pill" style="background:#fbe0e0;color:#a31515;">🔴 duplicate submit</span>' : (q.possibleDuplicateOf ? ' <span class="pill" style="background:#fdf0d5;color:#8a5f00;">⚠ possible duplicate</span>' : '')}</td>
-        <td>${new Date(q.date).toLocaleString('en-ZA')}</td>
-        <td>${q.name || ''}</td>
-        <td>${q.email || ''}</td>
-        <td>${q.phone || ''}</td>
-        <td>${(q.items || []).map((it) => it.name + ' x' + it.qty).join(', ')}</td>
-        <td>${fmtZAR(q.grandTotal)}</td>
-        <td>
-          <div class="stage-stepper">${stageStepperHtml(q.stage)}</div>
-          <select class="stage-select" onchange="setQuoteStage('${q.quoteNumber}', this.value)">
-            <option value="">Move to…</option>
-            ${QUOTE_STAGES.map((s) => `<option value="${s.key}">${s.label}</option>`).join('')}
-          </select>
-        </td>
-        <td>
-          ${q.formalQuoteId
-            ? `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="switchPanel('formalquotes'); loadFormalQuotes().then(() => openFormalQuoteForm(${q.formalQuoteId}))">Open Formal Quote</button>`
-            : (q.status === 'sent'
-                ? '<span class="muted">Sent</span>'
-                : `<button class="btn" style="padding:6px 14px;font-size:12px;" onclick="sendQuote('${q.quoteNumber}', this)">Send to Client</button>`)}
-          <button class="btn-outline-sm" onclick="generateInvoice('${q.quoteNumber}', this)">Generate Invoice</button>
-          ${q.phone ? `<a class="btn-outline-sm" style="text-decoration:none;display:inline-block;background:#25d366;color:#fff;border-color:#25d366;" href="${whatsappQuoteLink(q.phone, q.quoteNumber, q.name)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
-        </td>
-      </tr>`).join('') || '<tr><td colspan="9" class="muted">No quote requests yet</td></tr>';
+    lastQuoteRequests = data.quoteRequests;
+    renderQuotesTable();
 
     document.querySelector('#recent-views-table tbody').innerHTML = data.recentViews
       .map((v) => `<tr>
