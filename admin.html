@@ -446,6 +446,10 @@
           <div class="form-row"><label>Phone (for WhatsApp)</label><input type="text" id="ql-phone" placeholder="e.g. 0821234567"></div>
         </div>
         <div class="form-row"><label>Company</label><input type="text" id="ql-company"></div>
+        <div class="form-row">
+          <button class="btn-outline-sm" onclick="sendWhatsAppMenu(document.getElementById('ql-phone').value)">📋 Send Opening Menu First</button>
+          <span class="muted" style="font-size:12px;margin-left:6px;">Sends the numbered menu set in Settings — do this before building a quote if they haven't said what they need yet.</span>
+        </div>
 
         <div class="form-row" style="position:relative;">
           <label>Add Product</label>
@@ -553,6 +557,10 @@
         <div class="form-row">
           <label>Footer Terms Text</label>
           <textarea id="s-footerTerms"></textarea>
+        </div>
+        <div class="form-row">
+          <label>WhatsApp Opening Menu <span class="muted" style="font-weight:400;">(no automation — staff send this manually when a chat starts; when the client replies with a number, you read it and respond)</span></label>
+          <textarea id="s-whatsappMenuText" style="min-height:140px;"></textarea>
         </div>
         <button class="btn" onclick="saveSettings()">Save Settings</button>
         <p class="muted" id="settings-status" style="margin-top:10px;"></p>
@@ -2085,6 +2093,7 @@
         ${waLink ? `<a class="btn-outline-sm" style="background:#25d366;color:#fff;border-color:#25d366;" href="${waLink}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
         ${c.phone ? `<a class="btn-outline-sm" href="tel:${c.phone}">📞 Call</a>` : ''}
         <a class="btn-outline-sm" href="mailto:${c.email}">✉️ Email</a>
+        ${c.phone ? `<button class="btn-outline-sm" onclick="sendWhatsAppMenu(${JSON.stringify(c.phone)})">📋 Send Menu</button>` : ''}
         <button class="btn-outline-sm" onclick="switchPanel('quicklink'); document.getElementById('ql-client-search').value = ${JSON.stringify(c.name || '')}; document.getElementById('ql-name').value = ${JSON.stringify(c.name || '')}; document.getElementById('ql-phone').value = ${JSON.stringify(c.phone || '')}; document.getElementById('ql-company').value = ${JSON.stringify(c.company || '')};">+ New Quick Quote</button>
       </div>
 
@@ -2501,6 +2510,21 @@
     });
   }
 
+  // Sends the ready-made numbered menu (edited in Settings) to open a
+  // WhatsApp chat — no automation; when the client replies with a number,
+  // staff read it and respond manually.
+  function sendWhatsAppMenu(phone) {
+    const digits = String(phone || '').replace(/[^0-9]/g, '');
+    if (!digits) { alert('No phone number on file — enter one first.'); return; }
+    const waNumber = digits.startsWith('0') ? '27' + digits.slice(1) : digits;
+    fetch('/api/admin/settings?' + authQS())
+      .then((r) => r.json())
+      .then((data) => {
+        const menuText = (data.settings && data.settings.whatsappMenuText) || 'Welcome! How can we help you today?';
+        window.open('https://wa.me/' + waNumber + '?text=' + encodeURIComponent(menuText), '_blank');
+      });
+  }
+
   function openQuoteRefModal(id) {
     const q = currentFormalQuotes.find((x) => x.id === id);
     if (!q) return;
@@ -2879,6 +2903,7 @@
         document.getElementById('s-vatNumber').value = s.vatNumber || '';
         document.getElementById('s-bankDetails').value = s.bankDetails || '';
         document.getElementById('s-footerTerms').value = s.footerTerms || '';
+        document.getElementById('s-whatsappMenuText').value = s.whatsappMenuText || '';
       });
   }
 
@@ -2890,6 +2915,7 @@
       vatNumber: document.getElementById('s-vatNumber').value,
       bankDetails: document.getElementById('s-bankDetails').value,
       footerTerms: document.getElementById('s-footerTerms').value,
+      whatsappMenuText: document.getElementById('s-whatsappMenuText').value,
     };
     fetch('/api/admin/settings?' + authQS(), {
       method: 'PUT',
