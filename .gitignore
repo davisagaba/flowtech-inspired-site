@@ -1,1 +1,5 @@
 claude-code-handoff/
+
+# Impeccable (design/UI review skill) — local-only config
+.impeccable/config.local.json
+.impeccable/cache/
