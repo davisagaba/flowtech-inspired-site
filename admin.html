@@ -423,8 +423,17 @@
           <label style="margin-bottom:6px;">Add from WhatsApp Web</label>
           <p class="muted" style="margin:0 0 10px;">Drag this button to your bookmarks bar. While you're chatting with a client on <strong>web.whatsapp.com</strong>, click it — it opens this tool in a new tab with their name (and phone, if they're not already saved as a contact) filled in.</p>
           <a id="ql-bookmarklet" href="#" class="btn-outline-sm" style="text-decoration:none;display:inline-block;" onclick="return false;" title="Drag me to your bookmarks bar">📲 Add from WhatsApp</a>
-          <p class="muted" style="margin:10px 0 0;font-size:12px;">Can't drag it? Click here to <a href="#" onclick="document.getElementById('ql-bookmarklet-code').hidden = !document.getElementById('ql-bookmarklet-code').hidden; return false;">show the code to paste in manually</a>.</p>
-          <textarea id="ql-bookmarklet-code" readonly hidden style="width:100%;margin-top:8px;font-family:monospace;font-size:11px;height:70px;" onclick="this.select()"></textarea>
+          <p class="muted" style="margin:10px 0 0;font-size:12px;">Dragging not working? <a href="#" onclick="document.getElementById('ql-bookmarklet-setup').hidden = !document.getElementById('ql-bookmarklet-setup').hidden; return false;">Set it up manually instead</a> — takes under a minute, no dragging needed.</p>
+          <div id="ql-bookmarklet-setup" hidden style="margin-top:10px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+            <ol style="margin:0 0 10px;padding-left:18px;font-size:13px;line-height:1.7;">
+              <li>Make sure your browser's bookmarks bar is showing (usually <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>, or Cmd+Shift+B on Mac).</li>
+              <li>Right-click anywhere on the bookmarks bar and choose <strong>Add page</strong> / <strong>Add bookmark</strong>.</li>
+              <li>For the name, type: <strong>Add from WhatsApp</strong></li>
+              <li>For the URL, click the button below to copy it, then paste it into the URL field.</li>
+              <li>Save. Done — click that bookmark any time you're on a WhatsApp Web chat.</li>
+            </ol>
+            <button type="button" class="btn-outline-sm" onclick="copyBookmarkletCode(this)">📋 Copy bookmarklet URL</button>
+          </div>
         </div>
 
         <div class="form-row" style="position:relative;">
@@ -2372,8 +2381,18 @@
     const bookmarklet = 'javascript:' + encodeURIComponent(src.replace(/\s+/g, ' '));
     const link = document.getElementById('ql-bookmarklet');
     if (link) link.href = bookmarklet;
-    const codeBox = document.getElementById('ql-bookmarklet-code');
-    if (codeBox) codeBox.value = bookmarklet;
+    currentBookmarkletUrl = bookmarklet;
+  }
+
+  let currentBookmarkletUrl = '';
+  function copyBookmarkletCode(btn) {
+    const original = btn.textContent;
+    navigator.clipboard.writeText(currentBookmarkletUrl).then(() => {
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = original; }, 2000);
+    }).catch(() => {
+      prompt('Copy this URL manually:', currentBookmarkletUrl);
+    });
   }
 
   function filterQuickLinkClients() {
