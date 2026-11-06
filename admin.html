@@ -1476,7 +1476,7 @@
         <button class="btn-outline-sm reply-btn" onclick="openCompose(${i})">Forward</button>
         ${currentMailFolder === 'inbox' ? (
           extractQuoteNumberFromSubject(m.subject)
-            ? `<button class="btn-outline-sm reply-btn" style="background:#eaf5f4;border-color:var(--teal);" onclick="openFormalQuoteByNumber(${JSON.stringify(extractQuoteNumberFromSubject(m.subject))}, this)">📄 Open Formal Quote</button>`
+            ? `<button class="btn-outline-sm reply-btn" style="background:#eaf5f4;border-color:var(--teal);" data-quote-number="${extractQuoteNumberFromSubject(m.subject)}" onclick="openFormalQuoteByNumber(this.dataset.quoteNumber, this)">📄 Open Formal Quote</button>`
             : `<button class="btn-outline-sm reply-btn" onclick="showLinkToQuotePicker(${i})">🔗 Link to Quote</button>`
         ) : ''}
         ${currentMailFolder !== 'trash' ? `<button class="btn-danger-sm reply-btn" onclick="deleteMailMessage(${i})">Delete</button>` : ''}
