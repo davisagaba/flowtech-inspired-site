@@ -2064,6 +2064,7 @@ app.post('/admin/formal-quotes/:id/issue', requireAdmin, async (req, res) => {
     if (!String(quote.account || '').trim()) quote.account = 'CASR023';
     if (!String(quote.customerVatNo || '').trim()) quote.customerVatNo = '4010136408';
     if (!String(quote.refNo || '').trim()) quote.refNo = quote.docNumber;
+    if (!String(quote.accountRep || '').trim()) quote.accountRep = 'Sales Manager';
     // Last-chance catalog weight fill — covers drafts created before the
     // catalog had weights on file, or where staff issued without ever
     // opening the item editor (which is what normally triggers the lookup).
