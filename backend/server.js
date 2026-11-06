@@ -2279,6 +2279,23 @@ app.post('/admin/formal-quotes/:id/send', requireAdmin, async (req, res) => {
       appendQuoteUpdate(linkedLead.quoteNumber, { status: 'sent', stage: 'quote_sent', sentAt: new Date().toISOString() });
     }
 
+    // Auto-mark the original "New Quote Request from ..." staff alert as
+    // read once the quote it's about has actually been sent — it's been
+    // handled, so it shouldn't keep sitting in the unread count.
+    if (quote.sourceQuoteNumber) {
+      fetchMailbox('INBOX', 100)
+        .then((inboxMessages) => {
+          const notification = inboxMessages.find((m) => !m.seen && m.subject.includes(quote.sourceQuoteNumber));
+          if (!notification) return;
+          const client = imapClient();
+          return client.connect()
+            .then(() => client.getMailboxLock('INBOX'))
+            .then((lock) => client.messageFlagsAdd({ uid: String(notification.uid) }, ['\\Seen'], { uid: true }).finally(() => lock.release()))
+            .finally(() => client.logout().catch(() => {}));
+        })
+        .catch((err) => console.warn('Auto-mark-read of source notification failed:', err.message));
+    }
+
     logActivity(req.adminUser, 'sent_formal_quote', `${quote.docNumber} to ${quote.customerEmail}`);
     res.json({ ok: true });
   } catch (err) {
