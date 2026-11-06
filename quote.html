@@ -115,11 +115,12 @@
             <div id="qproduct-suggestions" class="qproduct-suggestions" hidden></div>
           </label>
           <label>When do you need this by?
-            <select id="qtimeline">
-              <option>Just researching</option>
+            <select id="qtimeline" required>
+              <option value="" disabled selected>Select a timeline…</option>
+              <option>Urgent — within a week</option>
               <option>Within 1 month</option>
               <option>Within 3 months</option>
-              <option>Urgent</option>
+              <option>Just researching</option>
             </select>
           </label>
           <label>Additional Requirements
@@ -342,6 +343,14 @@
       qproductInput.setCustomValidity('Please select at least one product from the suggestions list — we can only quote products we actually stock.');
       qproductInput.reportValidity();
       qproductInput.setCustomValidity('');
+      return;
+    }
+    const qtimelineInput = document.getElementById('qtimeline');
+    if (!qtimelineInput.value) {
+      qtimelineInput.focus();
+      qtimelineInput.setCustomValidity('Please let us know your timeline.');
+      qtimelineInput.reportValidity();
+      qtimelineInput.setCustomValidity('');
       return;
     }
     const productSummary = quoteItems.map(({ qty, product }) => `${product.name} x${qty}`).join(', ');
