@@ -47,7 +47,7 @@ const DEFAULT_SETTINGS = {
   // A ready-made numbered menu staff can send manually at the start of a
   // WhatsApp chat — no automation, just a canned message; when the client
   // replies with a number, staff read it and respond by hand.
-  whatsappMenuText: 'Welcome to Life Style Ceramics 🙂 How can we help you today?\n\nType a number to continue:\n1️⃣ Request a Quote\n2️⃣ Track an Existing Quote\n3️⃣ Product Availability / Stock\n4️⃣ Delivery & Installation Info\n5️⃣ Speak to a Sales Rep\n6️⃣ Other',
+  whatsappMenuText: 'Welcome to Life Style Ceramics 🙂 How can we help you today?\n\nType a number to continue:\n1️⃣ Request a Quote\n2️⃣ Track an Existing Quote\n3️⃣ Product Availability / Stock\n4️⃣ Delivery & Installation Info\n5️⃣ Speak to a Sales Rep\n6️⃣ Other\n\nYou can also request a quote anytime here: https://lyfestyleceramics.co.za/quote.html',
 };
 function loadSettings() {
   if (!fs.existsSync(SETTINGS_JSON)) return { ...DEFAULT_SETTINGS };
