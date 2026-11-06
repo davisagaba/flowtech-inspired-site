@@ -200,6 +200,19 @@
     const product = getProductByParam(params);
     if (product) quoteItems = [{ id: product.id, qty: 1, product }];
   }
+  // Multi-item deep link, e.g. ?items=LSC-9375:45,FLW-101-001:2 — used by
+  // the admin's Quick Quote Link tool so a WhatsApp-shared link arrives
+  // pre-loaded with the exact products/quantities already discussed.
+  if (quoteItems.length === 0 && params.get('items')) {
+    quoteItems = params.get('items').split(',').map((pair) => {
+      const [code, qtyStr] = pair.split(':');
+      const product = CATALOG.find((p) => (p.code || '').toLowerCase() === (code || '').trim().toLowerCase());
+      return product ? { id: product.id, qty: Math.max(1, Number(qtyStr) || 1), product } : null;
+    }).filter(Boolean);
+  }
+  if (params.get('name')) document.getElementById('qname').value = params.get('name');
+  if (params.get('phone')) document.getElementById('qphone').value = params.get('phone');
+  if (params.get('company')) document.getElementById('qcompany').value = params.get('company');
 
   const itemsWrap = document.getElementById('quote-items-wrap');
   const fallbackWrap = document.getElementById('qproduct-fallback-wrap');

@@ -242,6 +242,7 @@
         <button class="nav-item" id="ptab-quotes" onclick="switchPanel('quotes')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h6"/></svg><span>Quotes</span></button>
         <button class="nav-item" id="ptab-formalquotes" onclick="switchPanel('formalquotes')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><circle cx="9" cy="14" r="1"/><path d="M12 14h3M9 17h6"/></svg><span>Formal Quotes</span></button>
         <button class="nav-item" id="ptab-clients" onclick="switchPanel('clients')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3.1-6 7-6s7 2 7 6"/><circle cx="17" cy="8" r="3"/><path d="M22 21c0-3.3-2-5.3-4.5-5.9"/></svg><span>Clients</span></button>
+        <button class="nav-item" id="ptab-quicklink" onclick="switchPanel('quicklink')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-9 9"/><path d="M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></svg><span>Quick Quote Link</span></button>
         <button class="nav-item" id="ptab-documents" onclick="switchPanel('documents')"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/></svg><span>Documents</span></button>
 
         <div class="sidebar-group-label">Inventory</div>
@@ -382,6 +383,38 @@
           <div class="mail-list" id="clients-list"><div class="mail-empty">Loading…</div></div>
           <div class="mail-reading-pane" id="client-detail-pane"><div class="mail-empty">Select a client to view their history</div></div>
         </div>
+      </section>
+    </div>
+
+    <div class="panel" id="panel-quicklink">
+      <section>
+        <h2 style="font-size:16px;">Quick Quote Link</h2>
+        <p class="muted">Build a pre-filled quote link to send over WhatsApp — the client lands on the form with their details and items already loaded, they just review and submit.</p>
+
+        <div class="form-row" style="position:relative;">
+          <label>Client</label>
+          <input type="text" id="ql-client-search" placeholder="Search existing client by name/phone, or type a new one…" autocomplete="off" oninput="filterQuickLinkClients()">
+          <div id="ql-client-suggestions" class="qproduct-suggestions" hidden></div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Name</label><input type="text" id="ql-name"></div>
+          <div class="form-row"><label>Phone (for WhatsApp)</label><input type="text" id="ql-phone" placeholder="e.g. 0821234567"></div>
+        </div>
+        <div class="form-row"><label>Company</label><input type="text" id="ql-company"></div>
+
+        <div class="form-row" style="position:relative;">
+          <label>Add Product</label>
+          <input type="text" id="ql-product-search" placeholder="Start typing a product name…" autocomplete="off" oninput="filterQuickLinkProducts()">
+          <div id="ql-product-suggestions" class="qproduct-suggestions" hidden></div>
+        </div>
+        <table style="margin-bottom:8px;">
+          <thead><tr><th>Product</th><th>Qty</th><th></th></tr></thead>
+          <tbody id="ql-items-tbody"></tbody>
+        </table>
+
+        <button class="btn" onclick="generateQuickQuoteLink()">Generate &amp; Open in WhatsApp</button>
+        <button class="btn-outline-sm" onclick="copyQuickQuoteLink()">Copy Link Only</button>
+        <p class="muted" id="ql-status" style="margin-top:10px;"></p>
       </section>
     </div>
 
@@ -1119,10 +1152,10 @@
   }
 
   // ---------- Panel tabs ----------
-  const PANEL_NAMES = ['overview', 'email', 'products', 'stock', 'quotes', 'formalquotes', 'clients', 'documents', 'visitors', 'activity', 'users', 'settings'];
+  const PANEL_NAMES = ['overview', 'email', 'products', 'stock', 'quotes', 'formalquotes', 'clients', 'quicklink', 'documents', 'visitors', 'activity', 'users', 'settings'];
   const PANEL_TITLES = {
     overview: 'Dashboard', email: 'Email', products: 'Products', stock: 'Stock Control',
-    quotes: 'Quote Requests', formalquotes: 'Formal Quotations', clients: 'Clients', documents: 'Documents',
+    quotes: 'Quote Requests', formalquotes: 'Formal Quotations', clients: 'Clients', quicklink: 'Quick Quote Link', documents: 'Documents',
     visitors: 'Visitors', activity: 'Activity Log', users: 'Admin Users', settings: 'Settings',
   };
   const OWNER_ONLY_PANELS = ['activity', 'users', 'settings'];
@@ -1140,6 +1173,7 @@
     if (name === 'stock') loadStock();
     if (name === 'formalquotes') loadFormalQuotes();
     if (name === 'clients') loadClients();
+    if (name === 'quicklink' && currentClients.length === 0) loadClients();
     if (name === 'documents') loadDocuments();
     if (name === 'settings') loadSettingsForm();
     if (name === 'overview') loadOverviewExtras();
@@ -2091,6 +2125,107 @@
 
   function closeFormalQuoteForm() {
     document.getElementById('formal-quote-modal').classList.remove('open');
+  }
+
+  // ---------- Quick Quote Link (WhatsApp) ----------
+  let quickLinkItems = [];
+
+  function filterQuickLinkClients() {
+    const term = document.getElementById('ql-client-search').value.trim().toLowerCase();
+    const box = document.getElementById('ql-client-suggestions');
+    if (term.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+    const matches = currentClients
+      .filter((c) => (c.name || '').toLowerCase().includes(term) || (c.phone || '').includes(term) || (c.email || '').toLowerCase().includes(term))
+      .slice(0, 8);
+    if (matches.length === 0) { box.hidden = true; box.innerHTML = ''; return; }
+    box.innerHTML = matches.map((c, i) => `
+      <div class="qproduct-suggestion" data-i="${i}">${c.name || '(no name)'}<span class="qps-code">${c.phone || c.email || ''}</span></div>
+    `).join('');
+    box.hidden = false;
+    box.querySelectorAll('.qproduct-suggestion').forEach((el) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const c = matches[Number(el.dataset.i)];
+        document.getElementById('ql-client-search').value = c.name || '';
+        document.getElementById('ql-name').value = c.name || '';
+        document.getElementById('ql-phone').value = c.phone || '';
+        document.getElementById('ql-company').value = c.company || '';
+        box.hidden = true;
+      });
+    });
+  }
+
+  function filterQuickLinkProducts() {
+    const term = document.getElementById('ql-product-search').value.trim().toLowerCase();
+    const box = document.getElementById('ql-product-suggestions');
+    if (term.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+    const matches = currentProducts
+      .filter((p) => (p.name || '').toLowerCase().includes(term) || (p.code || '').toLowerCase().includes(term))
+      .slice(0, 8);
+    if (matches.length === 0) { box.hidden = true; box.innerHTML = ''; return; }
+    box.innerHTML = matches.map((p, i) => `
+      <div class="qproduct-suggestion" data-i="${i}">${p.name}<span class="qps-code">${p.code || ''}</span></div>
+    `).join('');
+    box.hidden = false;
+    box.querySelectorAll('.qproduct-suggestion').forEach((el) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const p = matches[Number(el.dataset.i)];
+        const existing = quickLinkItems.find((it) => it.code === p.code);
+        if (existing) { existing.qty += 1; } else { quickLinkItems.push({ code: p.code, name: p.name, qty: 1 }); }
+        document.getElementById('ql-product-search').value = '';
+        box.hidden = true;
+        renderQuickLinkItems();
+      });
+    });
+  }
+
+  function renderQuickLinkItems() {
+    document.getElementById('ql-items-tbody').innerHTML = quickLinkItems.map((it, i) => `
+      <tr>
+        <td>${it.name} <span class="muted" style="font-size:11px;">${it.code}</span></td>
+        <td><input type="number" min="1" value="${it.qty}" style="width:60px;" onchange="quickLinkItems[${i}].qty = Math.max(1, Number(this.value) || 1)"></td>
+        <td><button type="button" class="btn-danger-sm" onclick="quickLinkItems.splice(${i},1); renderQuickLinkItems();">×</button></td>
+      </tr>`).join('') || '<tr><td colspan="3" class="muted">No products added yet</td></tr>';
+  }
+
+  function buildQuickQuoteLink() {
+    const name = document.getElementById('ql-name').value.trim();
+    const phone = document.getElementById('ql-phone').value.trim();
+    const company = document.getElementById('ql-company').value.trim();
+    if (quickLinkItems.length === 0) return { error: 'Add at least one product first.' };
+    const itemsParam = quickLinkItems.map((it) => `${it.code}:${it.qty}`).join(',');
+    const qs = new URLSearchParams();
+    if (name) qs.set('name', name);
+    if (phone) qs.set('phone', phone);
+    if (company) qs.set('company', company);
+    qs.set('items', itemsParam);
+    return { url: 'https://lyfestyleceramics.co.za/quote.html?' + qs.toString(), name, phone, items: quickLinkItems };
+  }
+
+  function generateQuickQuoteLink() {
+    const status = document.getElementById('ql-status');
+    const result = buildQuickQuoteLink();
+    if (result.error) { status.textContent = result.error; return; }
+    const itemsSummary = result.items.map((it) => `${it.name} x${it.qty}`).join(', ');
+    const firstName = (result.name || '').split(' ')[0] || 'there';
+    const message = `Hi ${firstName}!\n\nHere's your quote request ready to go:\n- ${result.items.map((it) => it.name + ' x' + it.qty).join('\n- ')}\n\nJust tap the link below to review and submit — takes 10 seconds:\n${result.url}\n\nThanks!\nLifestyle Ceramics`;
+    const phoneDigits = (result.phone || '').replace(/[^\d]/g, '');
+    const waNumber = phoneDigits ? (phoneDigits.startsWith('0') ? '27' + phoneDigits.slice(1) : phoneDigits) : '';
+    const waUrl = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(message);
+    status.textContent = waNumber ? 'Opening WhatsApp…' : 'No phone number — opening WhatsApp without a specific contact, paste the chat in manually.';
+    window.open(waUrl, '_blank');
+  }
+
+  function copyQuickQuoteLink() {
+    const status = document.getElementById('ql-status');
+    const result = buildQuickQuoteLink();
+    if (result.error) { status.textContent = result.error; return; }
+    navigator.clipboard.writeText(result.url).then(() => {
+      status.textContent = 'Link copied to clipboard.';
+    }).catch(() => {
+      status.textContent = result.url;
+    });
   }
 
   function openQuoteRefModal(id) {
