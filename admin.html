@@ -2261,9 +2261,17 @@
     const status = document.getElementById('ql-status');
     const result = buildQuickQuoteLink();
     if (result.error) { status.textContent = result.error; return; }
-    const itemsSummary = result.items.map((it) => `${it.name} x${it.qty}`).join(', ');
     const firstName = (result.name || '').split(' ')[0] || 'there';
-    const message = `Hi ${firstName}!\n\nHere's your quote request ready to go:\n- ${result.items.map((it) => it.name + ' x' + it.qty).join('\n- ')}\n\nJust tap the link below to review and submit — takes 10 seconds:\n${result.url}\n\nThanks!\nLifestyle Ceramics`;
+    const pricedItems = result.items.map((it) => {
+      const product = currentProducts.find((p) => p.code === it.code);
+      const unitPrice = product ? gbpBaseToZar(Number(product.price)) : 0;
+      return { ...it, unitPrice, lineTotal: unitPrice * it.qty };
+    });
+    const grandTotal = pricedItems.reduce((sum, it) => sum + it.lineTotal, 0);
+    const itemLines = pricedItems.map((it) =>
+      `- ${it.name} x${it.qty} — ${fmtZAR(it.lineTotal)}`
+    ).join('\n');
+    const message = `Hi ${firstName}!\n\nHere's your quote request ready to go:\n${itemLines}\n\nEstimated total: ${fmtZAR(grandTotal)} (incl. VAT)\n\nJust tap the link below to review and submit — takes 10 seconds:\n${result.url}\n\nThanks!\nLifestyle Ceramics`;
     const phoneDigits = (result.phone || '').replace(/[^\d]/g, '');
     const waNumber = phoneDigits ? (phoneDigits.startsWith('0') ? '27' + phoneDigits.slice(1) : phoneDigits) : '';
     const waUrl = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(message);
