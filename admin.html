@@ -1380,8 +1380,10 @@
       <div class="reading-actions">
         ${currentMailFolder === 'inbox' ? `<button class="btn reply-btn" id="reply-toggle-btn" onclick="showInlineReply(${i})">Reply</button>` : ''}
         <button class="btn-outline-sm reply-btn" onclick="openCompose(${i})">Forward</button>
+        ${currentMailFolder === 'inbox' ? `<button class="btn-outline-sm reply-btn" onclick="showLinkToQuotePicker(${i})">🔗 Link to Quote</button>` : ''}
         ${currentMailFolder !== 'trash' ? `<button class="btn-danger-sm reply-btn" onclick="deleteMailMessage(${i})">Delete</button>` : ''}
       </div>
+      <div id="link-to-quote-box" style="position:relative;"></div>
       <div id="inline-reply-box"></div>
     `;
 
@@ -1647,6 +1649,64 @@
         status.textContent = 'Error: ' + err.message;
         if (btn) { btn.disabled = false; btn.textContent = 'Send Reply'; }
       });
+  }
+
+  // Manual fallback for linking an email to a formal quote — used when a
+  // reply's subject doesn't carry a doc number (auto-detection in
+  // detectAndLinkQuoteReplies on the backend only matches "Re: Your
+  // Quotation LC-QT-...").
+  function showLinkToQuotePicker(i) {
+    if (currentFormalQuotes.length === 0) { loadFormalQuotes().then(() => showLinkToQuotePicker(i)); return; }
+    const m = currentMailMessages[i];
+    const box = document.getElementById('link-to-quote-box');
+    box.innerHTML = `
+      <div class="form-row" style="margin-top:10px;">
+        <label>Link this email to a quote</label>
+        <input type="text" id="link-quote-search" placeholder="Search by customer name or doc number…" autocomplete="off" oninput="filterLinkToQuoteSuggestions(${i})">
+        <div id="link-quote-suggestions" class="qproduct-suggestions" hidden></div>
+      </div>
+      <p class="muted" id="link-quote-status"></p>
+    `;
+    document.getElementById('link-quote-search').focus();
+  }
+
+  function filterLinkToQuoteSuggestions(i) {
+    const term = document.getElementById('link-quote-search').value.trim().toLowerCase();
+    const box = document.getElementById('link-quote-suggestions');
+    if (term.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+    const matches = currentFormalQuotes
+      .filter((q) => (q.customerName || '').toLowerCase().includes(term) || (q.docNumber || '').toLowerCase().includes(term) || (q.customerEmail || '').toLowerCase().includes(term))
+      .slice(0, 8);
+    if (matches.length === 0) { box.hidden = true; box.innerHTML = ''; return; }
+    box.innerHTML = matches.map((q, mi) => `
+      <div class="qproduct-suggestion" data-mi="${mi}">${q.customerName}<span class="qps-code">${q.docNumber || '(draft #' + q.id + ')'}</span></div>
+    `).join('');
+    box.hidden = false;
+    box.querySelectorAll('.qproduct-suggestion').forEach((el) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        linkEmailToQuote(i, matches[Number(el.dataset.mi)]);
+      });
+    });
+  }
+
+  function linkEmailToQuote(i, quote) {
+    const m = currentMailMessages[i];
+    const status = document.getElementById('link-quote-status');
+    status.textContent = 'Linking…';
+    fetch('/api/admin/mailbox/link-to-quote?' + authQS(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: m.uid, date: m.date, quoteId: quote.id }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        document.getElementById('link-to-quote-box').innerHTML = '';
+        showMailToast(`Linked to ${quote.docNumber || '#' + quote.id}.`);
+        loadFormalQuotes();
+      })
+      .catch((err) => { status.textContent = 'Error: ' + err.message; });
   }
 
   function showMailToast(message) {
@@ -1980,7 +2040,7 @@
               : `<br><span class="pill" style="background:#fdf0d5;color:#8a5f00;">⚠ possible duplicate of ${duplicateOf.docNumber || '#' + duplicateOf.id}</span>`) : ''}</td>
             <td>${q.date}</td>
             <td>${total}</td>
-            <td><span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status}</span>${q.emailOpenedAt ? `<br><span class="pill done" style="margin-top:4px;">✓ Read ${q.emailOpenCount > 1 ? '(' + q.emailOpenCount + 'x)' : ''}</span>` : ''}</td>
+            <td><span class="pill ${q.status === 'sent' ? 'done' : ''}">${q.status}</span>${q.emailOpenedAt ? `<br><span class="pill done" style="margin-top:4px;">✓ Read ${q.emailOpenCount > 1 ? '(' + q.emailOpenCount + 'x)' : ''}</span>` : ''}${q.lastClientReplyAt ? `<br><span class="pill" style="margin-top:4px;background:#e3edfb;color:#1d4ed8;" title="${new Date(q.lastClientReplyAt).toLocaleString('en-ZA')}">💬 Replied ${q.replyCount > 1 ? '(' + q.replyCount + 'x)' : ''}</span>` : ''}</td>
             <td>
               ${canEdit ? `<button class="btn-outline-sm" onclick="openFormalQuoteForm(${q.id})">Edit</button>` : ''}
               ${!canEdit && q.status !== 'void' ? `<button class="btn-outline-sm" onclick="openQuoteRefModal(${q.id})">Edit Reference</button>` : ''}

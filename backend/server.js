@@ -73,6 +73,55 @@ function saveFormalDocs(docs) {
   fs.writeFileSync(FORMAL_DOCS_JSON, JSON.stringify(docs, null, 2));
 }
 
+// Scans freshly-fetched Inbox messages for a quotation doc number in the
+// subject (every quotation email uses "Your Quotation {docNumber} — ...",
+// which a client's "Re:" reply naturally preserves) and records it against
+// that formal quote — idempotent and safe to re-run on every inbox fetch,
+// since each message uid is only ever counted once per quote.
+const DOC_NUMBER_IN_SUBJECT = /LC-QT-\d{4}-\d{2}-\d{4}/;
+function detectAndLinkQuoteReplies(messages) {
+  const matches = messages
+    .map((m) => ({ m, docNumber: (m.subject.match(DOC_NUMBER_IN_SUBJECT) || [])[0] }))
+    .filter((x) => x.docNumber);
+  if (matches.length === 0) return;
+
+  const docs = loadFormalDocs();
+  let changed = false;
+  matches.forEach(({ m, docNumber }) => {
+    const quote = docs.find((d) => d.docNumber === docNumber);
+    if (!quote) return;
+    const uids = quote.repliedMessageUids || [];
+    if (uids.includes(m.uid)) return;
+    uids.push(m.uid);
+    quote.repliedMessageUids = uids;
+    quote.replyCount = uids.length;
+    if (!quote.lastClientReplyAt || new Date(m.date) > new Date(quote.lastClientReplyAt)) {
+      quote.lastClientReplyAt = m.date;
+    }
+    changed = true;
+  });
+  if (changed) saveFormalDocs(docs);
+}
+
+// Manually associates one email with a formal quote (fallback for when
+// the subject doesn't carry a doc number — forwarded, retyped, etc.).
+function linkMessageToQuote(uid, date, quoteId) {
+  const docs = loadFormalDocs();
+  const quote = docs.find((d) => d.id === quoteId);
+  if (!quote) return false;
+  const uids = quote.repliedMessageUids || [];
+  if (!uids.includes(uid)) {
+    uids.push(uid);
+    quote.repliedMessageUids = uids;
+    quote.replyCount = uids.length;
+    if (!quote.lastClientReplyAt || new Date(date) > new Date(quote.lastClientReplyAt)) {
+      quote.lastClientReplyAt = date;
+    }
+    saveFormalDocs(docs);
+  }
+  return true;
+}
+
 // One running sequence per document type per calendar year, atomic via
 // synchronous read-modify-write (single-process Node, no concurrent writers).
 function nextFormalDocNumber(typePrefix) {
@@ -1619,6 +1668,7 @@ app.get('/admin/mailbox/inbox', requireAdmin, async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 25, 100);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const messages = await fetchMailbox('INBOX', limit, offset);
+    detectAndLinkQuoteReplies(messages);
     res.json({ ok: true, messages });
   } catch (err) {
     console.error('Inbox fetch error:', err);
@@ -1812,6 +1862,17 @@ app.post('/admin/mailbox/delete', requireAdmin, async (req, res) => {
     console.error('Mailbox delete error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// Manual fallback for linking an email to a formal quote when the
+// subject doesn't carry a doc number (automatic detection missed it).
+app.post('/admin/mailbox/link-to-quote', requireAdmin, (req, res) => {
+  const { uid, date, quoteId } = req.body || {};
+  if (!uid || !quoteId) return res.status(400).json({ ok: false, error: 'Missing uid or quoteId.' });
+  const ok = linkMessageToQuote(Number(uid), date || new Date().toISOString(), Number(quoteId));
+  if (!ok) return res.status(404).json({ ok: false, error: 'Quote not found.' });
+  logActivity(req.adminUser, 'linked_email_to_quote', `uid ${uid} -> quote #${quoteId}`);
+  res.json({ ok: true });
 });
 
 // Downloads one attachment from a message by re-fetching and re-parsing it
